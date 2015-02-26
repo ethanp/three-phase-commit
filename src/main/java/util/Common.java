@@ -19,6 +19,9 @@ public class Common {
             }
             catch (IOException e) {
                 // ignore
+
+                /* ^ This will cause an infinite loop if the reason we can't claim
+                 * a port is NOT that the port is already taken... */
             }
         }
         return serverSocket;

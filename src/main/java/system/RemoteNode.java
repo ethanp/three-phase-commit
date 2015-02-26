@@ -7,13 +7,24 @@ import system.network.ObjectConnection;
  */
 public class RemoteNode {
     Process process;
-    int nodeID;
+    int id;
     ObjectConnection conn;
-
-    public Process getProcess() { return process; }
+    int listenPort;
 
     public RemoteNode(int nodeID, Process process) {
-        this.nodeID = nodeID;
+        this.id = nodeID;
         this.process = process;
+    }
+
+    public void setConn(ObjectConnection conn) {
+        this.conn = conn;
+    }
+
+    public void setListenPort(int listenPort) {
+        this.listenPort = listenPort;
+    }
+
+    public int getID() {
+        return id;
     }
 }

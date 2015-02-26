@@ -3,7 +3,7 @@ package system.network;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.DistributedSystem;
 import system.Message;
-import system.Node;
+import system.node.Node;
 
 import java.util.Collection;
 
@@ -19,6 +19,10 @@ public class Network {
 
     public void addConn(ObjectConnection connection) {
         connections.add(connection);
+    }
+
+    public int numConnections() {
+        return connections.size();
     }
 
     public enum Connectivity {
@@ -57,7 +61,7 @@ public class Network {
         return connectivity;
     }
 
-    public void applyConnectivity(Connectivity connectivity) {
+    public void applyConnectivity() {
 
     }
 }
