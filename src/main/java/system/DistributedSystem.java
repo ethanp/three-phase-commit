@@ -3,6 +3,7 @@ package system;
 import system.network.Network;
 import system.network.NetworkDelay;
 import system.network.ObjectConnection;
+import system.node.Node;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -14,7 +15,7 @@ import java.util.List;
  *
  * This is where program execution begins
  */
-public class DistributedSystem implements Runnable {
+public class DistributedSystem {
     protected List<RemoteNode> nodes;
     protected Network network;
     protected SystemServer systemServer;
@@ -25,14 +26,17 @@ public class DistributedSystem implements Runnable {
         /* start the system management server */
         systemServer = new SystemServer(this);
         new Thread(systemServer).start();
-        nodes = createNodes(numNodes, RemoteNode.class, systemServer.getListenPort());
+
+        /* spawn the participant instances, and store references to both their servers and pids */
+        nodes = createNodes(numNodes, Node.class, systemServer.getListenPort());
+
+        /* TODO wait for everyone to connect to the system */
+
+        /* wire participants up according to the given delay & connectivity arrangement */
         network = new Network(delay, connectivity, this);
-    }
 
-    public int numParticipants() { return nodes.size(); }
-
-    public Network getNetwork() {
-        return network;
+        /* TODO dub someone Coordinator */
+        /* TODO initiate protocol according to failure model ? */
     }
 
     public static void main(String[] args) {
@@ -45,20 +49,16 @@ public class DistributedSystem implements Runnable {
                 Failure.Model.NONE);
     }
 
-    @Override public void run() {
-
-    }
-
     public void addConn(ObjectConnection connection) {
         network.addConn(connection);
     }
 
 
     public static List<RemoteNode> createNodes(int numNodes, Class cl, int systemListenPort) {
-        final List<String> commandLine = Arrays.asList("java", "-cp", "target/classes");
-        commandLine.add(cl.getCanonicalName());
-        commandLine.add(String.valueOf(systemListenPort));
-        commandLine.add(String.valueOf(1));
+        final List<String> commandLine = Arrays.asList(
+                "java", "-cp", "target/classes", cl.getCanonicalName(),
+                String.valueOf(systemListenPort), "fakeID"
+        );
 
         /* The start() method creates a new Process instance with those attributes.
            The start() method can be invoked repeatedly from the same instance to

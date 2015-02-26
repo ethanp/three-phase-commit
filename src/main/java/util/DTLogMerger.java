@@ -1,4 +1,4 @@
-package log;
+package util;
 
 /**
  * Ethan Petuchowski 2/26/15
