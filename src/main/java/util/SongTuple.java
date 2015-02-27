@@ -3,7 +3,7 @@ package util;
 /**
  * Ethan Petuchowski 2/27/15
  */
-public class SongTuple {
+public class SongTuple implements Comparable<SongTuple> {
     String name;
     String url;
 
@@ -27,5 +27,13 @@ public class SongTuple {
     @Override
     public int hashCode() {
         return name.hashCode();
+    }
+
+    /**
+     * @return a negative integer, zero, or a positive integer as this object is less than, equal
+     * to, or greater than the specified object.
+     */
+    @Override public int compareTo(SongTuple o) {
+        return name.compareTo(o.name);
     }
 }

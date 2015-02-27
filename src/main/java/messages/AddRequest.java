@@ -13,5 +13,9 @@ public class AddRequest extends Message {
         this.songTuple = songTuple;
     }
 
+    public SongTuple getSongTuple() {
+        return songTuple;
+    }
+
     SongTuple songTuple;
 }

@@ -45,4 +45,16 @@ public abstract class Node {
     public void log(String string) {
         dtLog.log(string);
     }
+
+    public boolean hasSong(SongTuple tuple) {
+        return playlist.contains(tuple);
+    }
+
+    public void log(Message msg) {
+        log(msg.getMsgId()+" "+msg.getCommand());
+    }
+
+    public boolean hasSong(String name) {
+        return playlist.contains(new SongTuple(name, "doesn't matter"));
+    }
 }
