@@ -19,9 +19,9 @@ public class DistributedSystem {
     protected List<RemoteNode> nodes;
     protected Network network;
     protected SystemServer systemServer;
-    protected Failure.Model failureModel;
+    protected Failure.Case failureCase;
 
-    public DistributedSystem(int numNodes, Network.Connectivity connectivity, NetworkDelay.Type delay, Failure.Model model) {
+    public DistributedSystem(int numNodes, NetworkDelay.Type delay, Failure.Case aCase) {
 
         /* start the system management server */
         systemServer = new SystemServer(this);
@@ -30,7 +30,7 @@ public class DistributedSystem {
         /* spawn the participant instances, and store references to both their servers and pids */
         nodes = createNodes(numNodes, systemServer.getListenPort());
 
-        network = new Network(delay, connectivity, this);
+        network = new Network(delay, this);
 
         /* wait for everyone to connect to the system (then the callback below gets called) */
     }
@@ -43,17 +43,16 @@ public class DistributedSystem {
         network.applyConnectivity();
 
         /* TODO dub someone Coordinator */
-        /* TODO initiate protocol according to failure model ? */
+        network.send(new Message(Message.Command.DUB_COORDINATOR), nodes.get(0));
     }
 
     public static void main(String[] args) {
 
         /* for now it only allows the default setup */
         new DistributedSystem(
-                3,
-                Network.Connectivity.ALL_TO_ALL,
+                10,
                 NetworkDelay.Type.NONE,
-                Failure.Model.NONE);
+                Failure.Case.NONE);
     }
 
     public void addConn(ObjectConnection connection) {

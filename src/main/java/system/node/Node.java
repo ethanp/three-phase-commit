@@ -4,9 +4,12 @@ import system.Protocol;
 import system.network.ObjectConnection;
 import util.Common;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Ethan Petuchowski 2/17/15
@@ -14,14 +17,17 @@ import java.net.Socket;
 public class Node {
 
     Protocol protocol;
-    int myNodeID;
+    private int myNodeID;
     ObjectConnection systemConnection;
+    StateMachine stateMachine;
     NodeServer nodeServer;
     DTLog log;
+    Map<String, String> playlist = new HashMap<>();
 
     Node(int systemListenPort, int myNodeID) {
-        this.myNodeID = myNodeID;
+        this.setMyNodeID(myNodeID);
         protocol = new ParticipantProtocol();
+        log = new DTLog(this, new File("logDir", String.valueOf(myNodeID)));
 
         /* start local server */
         nodeServer = new NodeServer();
@@ -40,7 +46,14 @@ public class Node {
             System.err.println("Node "+myNodeID+" couldn't establish connection to the System");
             System.exit(Common.EXIT_FAILURE);
         }
+    }
 
+    public int getMyNodeID() {
+        return myNodeID;
+    }
+
+    public void setMyNodeID(int myNodeID) {
+        this.myNodeID = myNodeID;
     }
 
     class NodeServer implements Runnable {
@@ -70,6 +83,7 @@ public class Node {
     public static void main(String[] args) throws IOException {
         int systemListenPort = Integer.parseInt(args[0]);
         int nodeID = Integer.parseInt(args[1]);
+        System.out.println("Node "+nodeID);
         Node node = new Node(systemListenPort, nodeID);
     }
 }

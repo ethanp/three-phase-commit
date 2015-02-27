@@ -1,6 +1,7 @@
 package system;
 
 import system.network.ObjectConnection;
+import util.Common;
 
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -20,14 +21,7 @@ public class SystemServer implements Runnable {
 
     public SystemServer(DistributedSystem system) {
         this.system = system;
-        while (serverSocket == null) {
-            try {
-                serverSocket = new ServerSocket(requestPort);
-            }
-            catch (IOException e) {
-                requestPort++;  // try next port
-            }
-        }
+        serverSocket = Common.claimOpenPort();
     }
 
     @Override public void run() {
