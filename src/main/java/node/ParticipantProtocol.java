@@ -1,4 +1,4 @@
-package system.node;
+package node;
 
 import system.Protocol;
 

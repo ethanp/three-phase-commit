@@ -1,5 +1,9 @@
-package system.node;
+package node.system;
 
+import messages.Message;
+import node.ParticipantProtocol;
+import node.base.Node;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.Protocol;
 import system.network.ObjectConnection;
 import util.Common;
@@ -8,26 +12,21 @@ import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.HashMap;
-import java.util.Map;
+
 
 /**
  * Ethan Petuchowski 2/17/15
  */
-public class Node {
+public class SystemNode extends Node {
 
     Protocol protocol;
-    private int myNodeID;
-    ObjectConnection systemConnection;
-    StateMachine stateMachine;
+    ObjectConnection tmConnection;
     NodeServer nodeServer;
-    DTLog log;
-    Map<String, String> playlist = new HashMap<>();
 
-    Node(int systemListenPort, int myNodeID) {
-        this.setMyNodeID(myNodeID);
+    SystemNode(int systemListenPort, int myNodeID) {
+        super(myNodeID);
         protocol = new ParticipantProtocol();
-        log = new DTLog(this, new File("logDir", String.valueOf(myNodeID)));
+        dtLog = new FileDTLog(new File("logDir", String.valueOf(myNodeID)), this);
 
         /* start local server */
         nodeServer = new NodeServer();
@@ -35,12 +34,12 @@ public class Node {
 
         /* connect to System */
         try {
-            systemConnection = new ObjectConnection(new Socket(Common.LOCALHOST, systemListenPort));
+            tmConnection = new ObjectConnection(new Socket(Common.LOCALHOST, systemListenPort));
             System.out.println("Node "+myNodeID+" connected to System");
 
             /* tell the System my ID then my listen port */
-            systemConnection.out.writeInt(myNodeID);
-            systemConnection.out.writeInt(nodeServer.getListenPort());
+            tmConnection.out.writeInt(myNodeID);
+            tmConnection.out.writeInt(nodeServer.getListenPort());
         }
         catch (IOException e) {
             System.err.println("Node "+myNodeID+" couldn't establish connection to the System");
@@ -48,12 +47,8 @@ public class Node {
         }
     }
 
-    public int getMyNodeID() {
-        return myNodeID;
-    }
-
-    public void setMyNodeID(int myNodeID) {
-        this.myNodeID = myNodeID;
+    @Override public void sendMessage(Message message) {
+        throw new NotImplementedException();
     }
 
     class NodeServer implements Runnable {
@@ -84,6 +79,6 @@ public class Node {
         int systemListenPort = Integer.parseInt(args[0]);
         int nodeID = Integer.parseInt(args[1]);
         System.out.println("Node "+nodeID);
-        Node node = new Node(systemListenPort, nodeID);
+        SystemNode node = new SystemNode(systemListenPort, nodeID);
     }
 }

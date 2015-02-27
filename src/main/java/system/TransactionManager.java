@@ -1,9 +1,10 @@
 package system;
 
+import messages.Message;
+import node.system.SystemNode;
 import system.network.Network;
 import system.network.NetworkDelay;
 import system.network.ObjectConnection;
-import system.node.Node;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -15,13 +16,13 @@ import java.util.List;
  *
  * This is where program execution begins
  */
-public class DistributedSystem {
+public class TransactionManager {
     protected List<RemoteNode> nodes;
     protected Network network;
     protected SystemServer systemServer;
     protected Failure.Case failureCase;
 
-    public DistributedSystem(int numNodes, NetworkDelay.Type delay, Failure.Case aCase) {
+    public TransactionManager(int numNodes, NetworkDelay.Type delay, Failure.Case aCase) {
 
         /* start the system management server */
         systemServer = new SystemServer(this);
@@ -42,14 +43,14 @@ public class DistributedSystem {
         /* wire participants up according to the given delay & connectivity arrangement */
         network.applyConnectivity();
 
-        /* TODO dub someone Coordinator */
-        network.send(new Message(Message.Command.DUB_COORDINATOR), nodes.get(0));
+        /* dub someone Coordinator */
+        network.send(new Message(Message.Command.DUB_COORDINATOR, 1), nodes.get(0));
     }
 
     public static void main(String[] args) {
 
         /* for now it only allows the default setup */
-        new DistributedSystem(
+        new TransactionManager(
                 10,
                 NetworkDelay.Type.NONE,
                 Failure.Case.NONE);
@@ -76,7 +77,7 @@ public class DistributedSystem {
 
     public static List<RemoteNode> createNodes(int numNodes, int systemListenPort) {
         final List<String> commandLine = Arrays.asList(
-                "java", "-cp", "target/classes", Node.class.getCanonicalName(),
+                "java", "-cp", "target/classes", SystemNode.class.getCanonicalName(),
                 String.valueOf(systemListenPort), "fakeID"
                                                       );
 

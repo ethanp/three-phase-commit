@@ -1,7 +1,7 @@
 package system.network;
 
-import system.DistributedSystem;
-import system.Message;
+import system.TransactionManager;
+import messages.Message;
 import system.RemoteNode;
 
 import java.util.Collection;
@@ -13,7 +13,7 @@ public class Network {
 
     private NetworkDelay.Type networkDelay;
     private Collection<ObjectConnection> connections;
-    private DistributedSystem system;
+    private TransactionManager system;
 
     public void addConn(ObjectConnection connection) {
         connections.add(connection);
@@ -23,7 +23,7 @@ public class Network {
         return connections.size();
     }
 
-    public Network(NetworkDelay.Type delay, DistributedSystem system) {
+    public Network(NetworkDelay.Type delay, TransactionManager system) {
         this.networkDelay = delay;
         this.system = system;
     }

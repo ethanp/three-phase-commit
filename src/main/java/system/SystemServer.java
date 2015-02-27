@@ -11,7 +11,7 @@ import java.net.Socket;
  * Ethan Petuchowski 2/26/15
  */
 public class SystemServer implements Runnable {
-    DistributedSystem system;
+    TransactionManager system;
     ServerSocket serverSocket;
     static int requestPort = 3000;
 
@@ -19,7 +19,7 @@ public class SystemServer implements Runnable {
         return serverSocket.getLocalPort();
     }
 
-    public SystemServer(DistributedSystem system) {
+    public SystemServer(TransactionManager system) {
         this.system = system;
         serverSocket = Common.claimOpenPort();
     }
