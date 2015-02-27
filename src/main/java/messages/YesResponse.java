@@ -5,6 +5,6 @@ package messages;
  */
 public class YesResponse extends Message {
     public YesResponse(Message request) {
-        super(Command.YES, request.getMsgId());
+        super(Command.YES, request.getTransactionID());
     }
 }

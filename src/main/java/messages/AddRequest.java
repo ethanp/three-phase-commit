@@ -8,8 +8,8 @@ import util.SongTuple;
  * Sent from TransactionManager to Coordinator
  */
 public class AddRequest extends Message {
-    public AddRequest(SongTuple songTuple, int msgId) {
-        super(Command.ADD, msgId);
+    public AddRequest(SongTuple songTuple, int transactionID) {
+        super(Command.ADD, transactionID);
         this.songTuple = songTuple;
     }
 

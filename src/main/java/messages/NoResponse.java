@@ -5,6 +5,6 @@ package messages;
  */
 public class NoResponse extends Message {
     public NoResponse(Message responseTo) {
-        super(Command.NO, responseTo.getMsgId());
+        super(Command.NO, responseTo.getTransactionID());
     }
 }

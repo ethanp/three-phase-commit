@@ -4,9 +4,9 @@ package messages;
  * Ethan Petuchowski 2/17/15
  */
 public class Message {
-    public Message(Command command, int msgId) {
+    public Message(Command command, int transactionID) {
         this.command = command;
-        this.msgId = msgId;
+        this.transactionID = this.transactionID;
     }
 
     public Command getCommand() {
@@ -28,9 +28,9 @@ public class Message {
     }
     Command command;
 
-    public int getMsgId() {
-        return msgId;
+    public int getTransactionID() {
+        return transactionID;
     }
 
-    int msgId;
+    int transactionID;
 }

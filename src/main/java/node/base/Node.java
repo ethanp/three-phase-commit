@@ -51,10 +51,14 @@ public abstract class Node {
     }
 
     public void log(Message msg) {
-        log(msg.getMsgId()+" "+msg.getCommand());
+        log(msg.getTransactionID()+" "+msg.getCommand());
     }
 
     public boolean hasSong(String name) {
         return playlist.contains(new SongTuple(name, "doesn't matter"));
+    }
+
+    public boolean addSong(SongTuple songTuple) {
+        return playlist.add(songTuple);
     }
 }
