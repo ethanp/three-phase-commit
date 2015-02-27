@@ -6,7 +6,7 @@ package messages;
 public class Message {
     public Message(Command command, int transactionID) {
         this.command = command;
-        this.transactionID = this.transactionID;
+        this.transactionID = transactionID;
     }
 
     public Command getCommand() {

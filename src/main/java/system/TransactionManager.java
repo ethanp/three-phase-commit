@@ -17,7 +17,7 @@ import java.util.List;
  * This is where program execution begins
  */
 public class TransactionManager {
-    protected List<RemoteNode> nodes;
+    protected List<SystemNodeReference> nodes;
     protected Network network;
     protected SystemServer systemServer;
     protected Failure.Case failureCase;
@@ -62,7 +62,7 @@ public class TransactionManager {
         try {
             int nodeID = connection.in.readInt();
             int nodeListenPort = connection.in.readInt();
-            RemoteNode node = remoteNodeWithID(nodeID);
+            SystemNodeReference node = remoteNodeWithID(nodeID);
             node.setConn(connection);
             node.setListenPort(nodeListenPort);
         }
@@ -75,7 +75,7 @@ public class TransactionManager {
     }
 
 
-    public static List<RemoteNode> createNodes(int numNodes, int systemListenPort) {
+    public static List<SystemNodeReference> createNodes(int numNodes, int systemListenPort) {
         final List<String> commandLine = Arrays.asList(
                 "java", "-cp", "target/classes", SystemNode.class.getCanonicalName(),
                 String.valueOf(systemListenPort), "fakeID"
@@ -92,7 +92,7 @@ public class TransactionManager {
         /* set subprocess STDOUT to the same as the current process */
         procBldr.redirectOutput(ProcessBuilder.Redirect.INHERIT);
 
-        final List<RemoteNode> nodes = new ArrayList<>();
+        final List<SystemNodeReference> nodes = new ArrayList<>();
         for (int nodeID = 1; nodeID <= numNodes; nodeID++) {
             Process p = null;
             int retries = 0;
@@ -101,7 +101,7 @@ public class TransactionManager {
                     int lastIdx = procBldr.command().size() - 1;
                     procBldr.command().set(lastIdx, String.valueOf(nodeID));
                     p = procBldr.start();
-                    nodes.add(new RemoteNode(nodeID, p));
+                    nodes.add(new SystemNodeReference(nodeID, p));
                 }
                 catch (IOException e) {
                     e.printStackTrace();
@@ -112,8 +112,8 @@ public class TransactionManager {
         return nodes;
     }
 
-    RemoteNode remoteNodeWithID(int nodeID) {
-        for (RemoteNode n : nodes)
+    SystemNodeReference remoteNodeWithID(int nodeID) {
+        for (SystemNodeReference n : nodes)
             if (n.getID() == nodeID)
                 return n;
         return null;

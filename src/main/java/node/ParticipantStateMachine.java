@@ -1,14 +1,19 @@
 package node;
 
-import messages.AddRequest;
-import messages.DeleteRequest;
+import messages.vote_req.AddRequest;
+import messages.CommitRequest;
+import messages.vote_req.DeleteRequest;
 import messages.Message;
 import messages.NoResponse;
 import messages.PrecommitRequest;
-import messages.UpdateRequest;
+import messages.vote_req.UpdateRequest;
 import messages.YesResponse;
+import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
+import java.util.Collection;
 
 /**
  * Ethan Petuchowski 2/27/15
@@ -22,7 +27,8 @@ public class ParticipantStateMachine extends StateMachine {
     final Node node;
 
     /* ATTRIBUTES */
-    protected int ongoingTransactionID = NO_ONGOING_TRANSACTION;
+    private int ongoingTransactionID = NO_ONGOING_TRANSACTION;
+    private Collection<PeerReference> peerSet = null;
     private boolean precommitted = false;
 
     public ParticipantStateMachine(Node node) {
@@ -50,6 +56,7 @@ public class ParticipantStateMachine extends StateMachine {
                 receivePrecommit((PrecommitRequest) msg);
                 break;
             case COMMIT:
+                receiveCommit((CommitRequest) msg);
                 break;
             case ABORT:
                 break;
@@ -79,6 +86,23 @@ public class ParticipantStateMachine extends StateMachine {
             respondNo(deleteRequest);
     }
 
+    private void receivePrecommit(PrecommitRequest precommitRequest) {
+        if (ongoingTransactionID != precommitRequest.getTransactionID()) {
+            /* TODO what do we do here? */
+            throw new NotImplementedException();
+        }
+        setPrecommitted(true);
+    }
+
+    private void receiveCommit(CommitRequest commitRequest) {
+        node.log(commitRequest);
+
+        // TODO perform commit of whatever the request was supposed to DO
+        throw new NotImplementedException();
+
+//        setOngoingTransactionID(NO_ONGOING_TRANSACTION);
+    }
+
     /** log ABORT and send NO */
     public void respondNo(Message message) {
         setOngoingTransactionID(NO_ONGOING_TRANSACTION);
@@ -86,9 +110,10 @@ public class ParticipantStateMachine extends StateMachine {
         node.sendMessage(new NoResponse(message));
     }
 
-    private void respondYes(Message message) {
-        setOngoingTransactionID(message.getTransactionID());
-        logAndSend(new YesResponse(message));
+    private void respondYes(VoteRequest voteRequest) {
+        setOngoingTransactionID(voteRequest.getTransactionID());
+        setPeerSet(voteRequest.getPeerSet());
+        logAndSend(new YesResponse(voteRequest));
     }
 
     private void logAndSend(Message message) {
@@ -104,18 +129,19 @@ public class ParticipantStateMachine extends StateMachine {
         this.ongoingTransactionID = ongoingTransactionID;
     }
 
-    private void receivePrecommit(PrecommitRequest msg) {
-        if (ongoingTransactionID != msg.getTransactionID()) {
-            /* TODO what do we do here? */
-        }
-        setPrecommitted(true);
-    }
-
     public boolean isPrecommitted() {
         return precommitted;
     }
 
     public void setPrecommitted(boolean precommitted) {
         this.precommitted = precommitted;
+    }
+
+    public Collection<PeerReference> getWorkingPeerSet() {
+        return peerSet;
+    }
+
+    public void setPeerSet(Collection<PeerReference> peerSet) {
+        this.peerSet = peerSet;
     }
 }

@@ -5,13 +5,13 @@ import system.network.ObjectConnection;
 /**
  * Ethan Petuchowski 2/16/15
  */
-public class RemoteNode {
+public class SystemNodeReference {
     Process process;
     int id;
     ObjectConnection conn;
     int listenPort;
 
-    public RemoteNode(int nodeID, Process process) {
+    public SystemNodeReference(int nodeID, Process process) {
         this.id = nodeID;
         this.process = process;
     }
