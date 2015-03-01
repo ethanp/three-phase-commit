@@ -1,6 +1,5 @@
 package node.base;
 
-import messages.Message;
 import node.CoordinatorStateMachine;
 import node.ParticipantStateMachine;
 import system.network.Connection;
@@ -18,10 +17,11 @@ public abstract class Node {
 
     protected StateMachine stateMachine;
     protected final int myNodeID;
-    final Set<SongTuple> playlist = new TreeSet<>();
+    protected final Set<SongTuple> playlist = new TreeSet<>();
     protected DTLog dtLog;
 
     protected Connection txnMgrConn;
+
     protected Collection<Connection> peerConns = new ArrayList<>();
 
     public Node(int myNodeID) {
@@ -45,18 +45,12 @@ public abstract class Node {
         this.dtLog = dtLog;
     }
 
-    public abstract void sendCoordinatorMessage(Message message);
-
     public void log(String string) {
         dtLog.log(string);
     }
 
     public boolean hasSong(SongTuple tuple) {
         return playlist.contains(tuple);
-    }
-
-    public void log(Message msg) {
-        log(msg.getTransactionID()+" "+msg.getCommand());
     }
 
     public boolean hasSong(String name) {
@@ -76,11 +70,15 @@ public abstract class Node {
         addSong(updatedSong);
     }
 
-    protected void receiveMessage(Message message) {
-        stateMachine.receiveMessage(message);
+    protected boolean receiveMessageFrom(Connection connection) {
+        return stateMachine.receiveMessage(connection);
     }
 
     public void becomeCoordinator() {
         stateMachine = new CoordinatorStateMachine();
+    }
+
+    public StateMachine getStateMachine() {
+        return stateMachine;
     }
 }

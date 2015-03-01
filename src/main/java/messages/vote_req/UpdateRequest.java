@@ -26,4 +26,8 @@ public class UpdateRequest extends VoteRequest {
     public SongTuple getUpdatedSong() {
         return updatedSong;
     }
+
+    @Override protected String actionLogString() {
+        return songName+"\n"+updatedSong.toLogString();
+    }
 }

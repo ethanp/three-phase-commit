@@ -12,13 +12,12 @@ public abstract class Connection {
     }
 
     protected int receiverID;
-    public abstract Message readObject();
-    public abstract void writeObject(Message o);
+    public abstract Message receiveMessage();
+    public abstract void sendMessage(Message o);
 
     public int getReceiverID() {
         return receiverID;
     }
-
     public void setReceiverID(int receiverID) {
         this.receiverID = receiverID;
     }

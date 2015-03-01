@@ -9,8 +9,8 @@ import system.network.QueueSocket;
 public class SyncManagerNodeRef extends ManagerNodeRef {
     public SyncManagerNodeRef(int nodeID, QueueSocket conn) {
         super(nodeID);
-        setConn(conn.getASide());
-        node = new SyncNode(nodeID, conn.getBSide());
+        setConn(conn.getConnectionToAID());
+        node = new SyncNode(nodeID, conn.getConnectionToBID());
     }
 
     SyncNode node;

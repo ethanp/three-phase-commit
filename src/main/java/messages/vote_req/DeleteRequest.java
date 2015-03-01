@@ -19,4 +19,8 @@ public class DeleteRequest extends VoteRequest {
     public String getSongName() {
         return songName;
     }
+
+    @Override protected String actionLogString() {
+        return songName;
+    }
 }

@@ -14,7 +14,9 @@ public class TestCommon {
             new PeerReference(2, 2),
             new PeerReference(3, 3),
             new PeerReference(4, 4));
-    public final static String A_SONG_NAME = "name";
-    public final static String A_URL = "url";
+    public final static String A_SONG_NAME = "sample name"; // should work even
+    public final static String A_URL = "sample url";        // if they have spaces
     public final static SongTuple A_SONG_TUPLE = new SongTuple(A_SONG_NAME, A_URL);
+    public static final int TEST_PEER_ID = 2;
+    public static final int TEST_COORD_ID = 2;
 }

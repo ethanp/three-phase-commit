@@ -21,4 +21,8 @@ public class AddRequest extends VoteRequest {
     }
 
     SongTuple songTuple;
+
+    @Override protected String actionLogString() {
+        return songTuple.toLogString();
+    }
 }

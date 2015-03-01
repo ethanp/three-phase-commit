@@ -28,7 +28,7 @@ public class ManagerNodeRef {
     }
 
     public void sendMessage(Message message) {
-        conn.writeObject(message);
+        conn.sendMessage(message);
     }
 
     public void killNode() {
@@ -36,6 +36,6 @@ public class ManagerNodeRef {
     }
 
     public Message receiveMessage() {
-        return conn.readObject();
+        return conn.receiveMessage();
     }
 }

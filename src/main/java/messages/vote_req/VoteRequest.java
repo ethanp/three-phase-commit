@@ -8,7 +8,7 @@ import java.util.Collection;
 /**
  * Ethan Petuchowski 2/27/15
  */
-public class VoteRequest extends Message {
+public abstract class VoteRequest extends Message {
 
     private Collection<PeerReference> peerSet;
 
@@ -20,4 +20,22 @@ public class VoteRequest extends Message {
     public Collection<PeerReference> getPeerSet() {
         return peerSet;
     }
+
+    public String getPeerSetLogString() {
+        StringBuilder sb = new StringBuilder("PEERS "+peerSet.size()+" ");
+        for (PeerReference peer : peerSet) {
+            sb.append(String.format(
+                    "%s %s ",
+                    peer.getNodeID(),
+                    peer.getListeningPort()));
+        }
+        return sb.toString();
+    }
+
+    @Override public String toLogString() {
+        return super.toLogString()+"\n"+actionLogString()+"\n"+
+               getPeerSetLogString()+"\n";
+    }
+
+    protected abstract String actionLogString();
 }

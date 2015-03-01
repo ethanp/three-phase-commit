@@ -1,14 +1,14 @@
 package node;
 
-import messages.Message;
 import node.base.StateMachine;
+import system.network.Connection;
 
 /**
  * Ethan Petuchowski 2/28/15
  */
 public class CoordinatorStateMachine extends StateMachine {
-    @Override public void receiveMessage(Message message) {
-        switch (message.getCommand()) {
+    @Override public boolean receiveMessage(Connection overConnection) {
+        switch (overConnection.receiveMessage().getCommand()) {
 
             case DUB_COORDINATOR:
                 break;
@@ -33,6 +33,6 @@ public class CoordinatorStateMachine extends StateMachine {
             case DELETE:
                 break;
         }
-
+        return true;
     }
 }

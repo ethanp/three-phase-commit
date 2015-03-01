@@ -11,7 +11,7 @@ import java.io.OutputStreamWriter;
  * Ethan Petuchowski 2/27/15
  */
 public class ByteArrayDTLog extends DTLog {
-    ByteArrayDTLog(Node node) {
+    public ByteArrayDTLog(Node node) {
         super(node);
         writer = new OutputStreamWriter(byteArray);
     }

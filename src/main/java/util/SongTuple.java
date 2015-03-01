@@ -36,4 +36,8 @@ public class SongTuple implements Comparable<SongTuple> {
     @Override public int compareTo(SongTuple o) {
         return name.compareTo(o.name);
     }
+
+    public String toLogString() {
+        return name+"\n"+url;
+    }
 }

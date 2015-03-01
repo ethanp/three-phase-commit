@@ -1,7 +1,7 @@
 package node.system;
 
-import messages.Message;
 import node.base.Node;
+import node.mock.ByteArrayDTLog;
 import system.network.Connection;
 import system.network.QueueConnection;
 
@@ -12,26 +12,28 @@ public class SyncNode extends Node {
     public SyncNode(int myNodeID, QueueConnection toTxnManager) {
         super(myNodeID);
         txnMgrConn = toTxnManager;
+        dtLog = new ByteArrayDTLog(this);
     }
 
-    @Override public void sendCoordinatorMessage(Message message) {
-
-    }
-
+    /**
+     * processes at most one incoming message
+     * @returns false if a message was processed
+     * @returns true if there were no messages to process
+     */
     public boolean tick() {
-        Message message;
-        message = txnMgrConn.readObject();
-        if (message != null) {
-            receiveMessage(message);
+
+        if (receiveMessageFrom(txnMgrConn)) {
             return false;
         }
+
         for (Connection connection : peerConns) {
-            message = connection.readObject();
-            if (message != null) {
-                receiveMessage(message);
+            if (receiveMessageFrom(connection)) {
                 return false;
             }
         }
+
         return true;
     }
+
+
 }

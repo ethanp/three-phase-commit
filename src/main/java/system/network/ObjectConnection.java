@@ -25,7 +25,7 @@ public class ObjectConnection extends Connection {
         }
     }
 
-    @Override public Message readObject() {
+    @Override public Message receiveMessage() {
         try {
             return (Message) in.readObject();
         }
@@ -35,7 +35,7 @@ public class ObjectConnection extends Connection {
         return null;
     }
 
-    @Override public void writeObject(Message o) {
+    @Override public void sendMessage(Message o) {
         try {
             out.writeObject(o);
         }

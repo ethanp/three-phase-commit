@@ -35,4 +35,8 @@ public class Message implements Serializable {
     }
 
     int transactionID;
+
+    public String toLogString() {
+        return command.toString()+" "+transactionID;
+    }
 }

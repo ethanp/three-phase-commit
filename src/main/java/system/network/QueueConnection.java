@@ -13,8 +13,8 @@ public class QueueConnection extends Connection {
         super(receiverID);
     }
 
-    Queue<Message> inQueue;
-    Queue<Message> outQueue;
+    protected Queue<Message> inQueue;
+    protected Queue<Message> outQueue;
 
     public QueueConnection(int receiverID, Queue<Message> inQueue, Queue<Message> outQueue) {
         super(receiverID);
@@ -22,11 +22,19 @@ public class QueueConnection extends Connection {
         this.outQueue = outQueue;
     }
 
-    @Override public Message readObject() {
+    @Override public Message receiveMessage() {
         return inQueue.poll();
     }
 
-    @Override public void writeObject(Message o) {
+    @Override public void sendMessage(Message o) {
         outQueue.add(o);
+    }
+
+    public Queue<Message> getInQueue() {
+        return inQueue;
+    }
+
+    public Queue<Message> getOutQueue() {
+        return outQueue;
     }
 }

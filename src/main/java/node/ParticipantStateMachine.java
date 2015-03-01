@@ -11,33 +11,40 @@ import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
+import system.network.Connection;
 
 import java.util.Collection;
+
+import static util.Common.NO_ONGOING_TRANSACTION;
 
 /**
  * Ethan Petuchowski 2/27/15
  */
 public class ParticipantStateMachine extends StateMachine {
 
-    /* CONSTANTS */
-    public final static int NO_ONGOING_TRANSACTION = -1;
-
     /* REFERENCES */
     final Node node;
 
     /* ONGOING TRANSACTION ATTRIBUTES */
     private int ongoingTransactionID = NO_ONGOING_TRANSACTION;
+    private VoteRequest action;  // the update being performed
     private Collection<PeerReference> peerSet = null;
     private boolean precommitted = false;
-
-    // the update being performed
-    private VoteRequest action;
+    private Connection currentConnection = null;
 
     public ParticipantStateMachine(Node node) {
         this.node = node;
     }
 
-    @Override public void receiveMessage(Message msg) {
+    @Override public boolean receiveMessage(Connection overConnection) {
+        currentConnection = overConnection;
+
+        Message msg = currentConnection.receiveMessage();
+
+        if (msg == null) {
+            return false;
+        }
+
         switch (msg.getCommand()) {
 
             /* VOTE REQUESTS */
@@ -66,6 +73,8 @@ public class ParticipantStateMachine extends StateMachine {
             default:
                 throw new RuntimeException("Not a valid message: "+msg.getCommand());
         }
+
+        return true;
     }
 
     private void receiveDubCoordinator(Message message) {
@@ -73,29 +82,26 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     private void receiveAddRequest(AddRequest addRequest) {
+        node.log(addRequest.toLogString());
 
-        /* regardless of whether you're going to say yes or no, log the request */
-        node.log(""); /*TODO something */
-
-        /* then respond yes or no */
         if (node.hasSong(addRequest.getSongTuple()))
-            respondNo(addRequest);
+            respondNoToVoteRequest(addRequest);
         else
-            respondYes(addRequest);
+            respondYesToVoteRequest(addRequest);
     }
 
     private void receiveUpdateRequest(UpdateRequest updateRequest) {
         if (!node.hasSong(updateRequest.getSongName()))
-            respondNo(updateRequest);
+            respondNoToVoteRequest(updateRequest);
         else
-            respondYes(updateRequest);
+            respondYesToVoteRequest(updateRequest);
     }
 
     private void receiveDeleteRequest(DeleteRequest deleteRequest) {
         if (node.hasSong(deleteRequest.getSongName()))
-            respondYes(deleteRequest);
+            respondYesToVoteRequest(deleteRequest);
         else
-            respondNo(deleteRequest);
+            respondNoToVoteRequest(deleteRequest);
     }
 
     /**
@@ -106,7 +112,7 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     private void receiveCommit(CommitRequest commitRequest) {
-        node.log(commitRequest);
+//        node.log(commitRequest);
 
         switch (action.getCommand()) {
             case ADD:
@@ -134,14 +140,13 @@ public class ParticipantStateMachine extends StateMachine {
         node.addSong(addRequest.getSongTuple());
     }
 
-    /** log ABORT and send NO */
-    public void respondNo(Message message) {
+    public void respondNoToVoteRequest(Message message) {
         setOngoingTransactionID(NO_ONGOING_TRANSACTION);
         node.log(message.getTransactionID()+" "+Message.Command.ABORT);
-        node.sendCoordinatorMessage(new NoResponse(message));
+        currentConnection.sendMessage(new NoResponse(message));
     }
 
-    private void respondYes(VoteRequest voteRequest) {
+    private void respondYesToVoteRequest(VoteRequest voteRequest) {
         action = voteRequest;
         setOngoingTransactionID(voteRequest.getTransactionID());
         setPeerSet(voteRequest.getPeerSet());
@@ -149,9 +154,12 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     private void logAndSend(Message message) {
-        node.log(message);
-        node.sendCoordinatorMessage(message);
+        node.log(message.getCommand().toString());
+        currentConnection.sendMessage(message);
     }
+
+
+    /* Getters and Setters */
 
     public int getOngoingTransactionID() {
         return ongoingTransactionID;

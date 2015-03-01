@@ -16,11 +16,11 @@ public class QueueSocket {
         this.aId = aId;
         this.bId = bId;
     }
-    public QueueConnection getASide() {
+    public QueueConnection getConnectionToAID() {
         return new QueueConnection(aId, aSideQueue, bSideQueue);
     }
 
-    public QueueConnection getBSide() {
+    public QueueConnection getConnectionToBID() {
         return new QueueConnection(bId, bSideQueue, aSideQueue);
     }
 }

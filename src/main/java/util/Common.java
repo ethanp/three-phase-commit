@@ -9,6 +9,9 @@ import java.net.ServerSocket;
 public class Common {
     public static final int EXIT_FAILURE = 1;
     public static final String LOCALHOST = "127.0.0.1";
+    public static final int INVALID_ID = -1;
+    /* CONSTANTS */
+    public final static int NO_ONGOING_TRANSACTION = -1;
     static int reqPort = 3000;
     public static final int TXN_MGR_ID = 0;
 

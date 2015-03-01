@@ -1,8 +1,6 @@
 package node.system;
 
-import messages.Message;
 import node.base.Node;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.network.ObjectConnection;
 import util.Common;
 
@@ -35,17 +33,13 @@ public class AsyncProcessNode extends Node {
             System.out.println("Node "+myNodeID+" connected to System");
 
             /* tell the System my ID then my listen port */
-//            connection.writeObject(new Integer(myNodeID));
+//            connection.sendMessage(new Integer(myNodeID));
 //            connection.out.writeInt(nodeServer.getListenPort());
         }
         catch (IOException e) {
             System.err.println("Node "+myNodeID+" couldn't establish connection to the System");
             System.exit(Common.EXIT_FAILURE);
         }
-    }
-
-    @Override public void sendCoordinatorMessage(Message message) {
-        throw new NotImplementedException();
     }
 
     class NodeServer implements Runnable {
