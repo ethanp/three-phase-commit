@@ -14,7 +14,10 @@ import node.base.StateMachine;
 import system.network.Connection;
 
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.PriorityQueue;
 
+import static messages.Message.Command.UR_ELECTED;
 import static util.Common.NO_ONGOING_TRANSACTION;
 
 /**
@@ -29,6 +32,7 @@ public class ParticipantStateMachine extends StateMachine {
     private int ongoingTransactionID = NO_ONGOING_TRANSACTION;
     private VoteRequest action;  // the update being performed
     private Collection<PeerReference> peerSet = null;
+    private Collection<PeerReference> upSet = null;
     private boolean precommitted = false;
     private Connection currentConnection = null;
 
@@ -69,6 +73,10 @@ public class ParticipantStateMachine extends StateMachine {
                 receiveCommit((CommitRequest) msg);
                 break;
             case ABORT:
+                receiveAbort(msg);
+                break;
+            case UR_ELECTED:
+                receiveUR_ELECTED(msg);
                 break;
             default:
                 throw new RuntimeException("Not a valid message: "+msg.getCommand());
@@ -77,42 +85,57 @@ public class ParticipantStateMachine extends StateMachine {
         return true;
     }
 
+    private void receiveUR_ELECTED(Message message) {
+        node.becomeCoordinator();
+    }
+
+    private void receiveAbort(Message message) {
+        node.log("ABORT");
+        action = null;
+        setPeerSet(null);
+        setUpSet(null);
+        ongoingTransactionID = NO_ONGOING_TRANSACTION;
+    }
+
     private void receiveDubCoordinator(Message message) {
         node.becomeCoordinator();
     }
 
-    private void receiveAddRequest(AddRequest addRequest) {
-        node.log(addRequest.toLogString());
+    private void receiveVoteRequest(VoteRequest voteRequest, boolean voteValue) {
+        node.log(voteRequest.toLogString());
+        if (voteValue) {
+            respondYESToVoteRequest(voteRequest);
+        }
+        else {
+            respondNOToVoteRequest(voteRequest);
+        }
+    }
 
-        if (node.hasSong(addRequest.getSongTuple()))
-            respondNoToVoteRequest(addRequest);
-        else
-            respondYesToVoteRequest(addRequest);
+    private void receiveAddRequest(AddRequest addRequest) {
+        receiveVoteRequest(addRequest, !node.hasSongTupleWithName(addRequest.getSongTuple()));
     }
 
     private void receiveUpdateRequest(UpdateRequest updateRequest) {
-        if (!node.hasSong(updateRequest.getSongName()))
-            respondNoToVoteRequest(updateRequest);
-        else
-            respondYesToVoteRequest(updateRequest);
+        receiveVoteRequest(updateRequest, node.hasSong(updateRequest.getSongName()));
     }
 
     private void receiveDeleteRequest(DeleteRequest deleteRequest) {
-        if (node.hasSong(deleteRequest.getSongName()))
-            respondYesToVoteRequest(deleteRequest);
-        else
-            respondNoToVoteRequest(deleteRequest);
+        receiveVoteRequest(deleteRequest, node.hasSong(deleteRequest.getSongName()));
     }
 
     /**
-     * doesn't log anything
+     * doesn't log anything (Lecture 3, Pg. 13), send ACK
      */
     private void receivePrecommit(PrecommitRequest precommitRequest) {
         setPrecommitted(true);
+        currentConnection.sendMessage(
+                new Message(
+                        Message.Command.ACK,
+                        getOngoingTransactionID()));
     }
 
     private void receiveCommit(CommitRequest commitRequest) {
-//        node.log(commitRequest);
+        node.log("COMMIT");
 
         switch (action.getCommand()) {
             case ADD:
@@ -140,16 +163,17 @@ public class ParticipantStateMachine extends StateMachine {
         node.addSong(addRequest.getSongTuple());
     }
 
-    public void respondNoToVoteRequest(Message message) {
+    public void respondNOToVoteRequest(Message message) {
         setOngoingTransactionID(NO_ONGOING_TRANSACTION);
         node.log(message.getTransactionID()+" "+Message.Command.ABORT);
         currentConnection.sendMessage(new NoResponse(message));
     }
 
-    private void respondYesToVoteRequest(VoteRequest voteRequest) {
+    private void respondYESToVoteRequest(VoteRequest voteRequest) {
         action = voteRequest;
         setOngoingTransactionID(voteRequest.getTransactionID());
-        setPeerSet(voteRequest.getPeerSet());
+        setPeerSet(voteRequest.getCloneOfPeerSet());
+        setUpSet(voteRequest.getCloneOfPeerSet());
         logAndSend(new YesResponse(voteRequest));
     }
 
@@ -177,11 +201,56 @@ public class ParticipantStateMachine extends StateMachine {
         this.precommitted = precommitted;
     }
 
-    public Collection<PeerReference> getWorkingPeerSet() {
+    public Collection<PeerReference> getPeerSet() {
         return peerSet;
     }
 
     public void setPeerSet(Collection<PeerReference> peerSet) {
         this.peerSet = peerSet;
+    }
+
+    public Collection<PeerReference> getUpSet() {
+        return upSet;
+    }
+
+    public void setUpSet(Collection<PeerReference> upSet) {
+        this.upSet = upSet;
+    }
+
+    public VoteRequest getAction() {
+        return action;
+    }
+
+    public void setAction(VoteRequest action) {
+        this.action = action;
+    }
+
+    public void coordinatorTimeoutOnHeartbeat(int coordinatorID) {
+        node.log("TIMEOUT "+coordinatorID);
+        removeNodeWithIDFromUpset(coordinatorID);
+        PeerReference lowestRemainingID = getNodeWithLowestIDInUpset();
+        Connection conn = node.connectTo(lowestRemainingID);
+        conn.sendMessage(new Message(UR_ELECTED, getOngoingTransactionID()));
+    }
+
+    private PeerReference getNodeWithLowestIDInUpset() {
+        if (getUpSet().isEmpty()) return null;
+        PriorityQueue<PeerReference> peerReferences = new PriorityQueue<>(getUpSet());
+        return peerReferences.poll();
+    }
+
+    private void removeNodeWithIDFromUpset(int id) {
+        PeerReference toRemove = null;
+        Iterator<PeerReference> referenceIterator = getUpSet().iterator();
+        while (referenceIterator.hasNext()) {
+            PeerReference ref = referenceIterator.next();
+            if (ref.getNodeID() == id) {
+                toRemove = ref;
+                break;
+            }
+        }
+        if (toRemove != null) {
+            getUpSet().remove(toRemove);
+        }
     }
 }

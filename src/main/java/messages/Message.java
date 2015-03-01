@@ -26,7 +26,8 @@ public class Message implements Serializable {
         ACK,
         ADD,
         UPDATE,
-        DELETE
+        DELETE,
+        UR_ELECTED
     }
     Command command;
 

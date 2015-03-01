@@ -9,10 +9,6 @@ import java.util.Queue;
  */
 public class QueueConnection extends Connection {
 
-    public QueueConnection(int receiverID) {
-        super(receiverID);
-    }
-
     protected Queue<Message> inQueue;
     protected Queue<Message> outQueue;
 

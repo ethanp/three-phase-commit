@@ -1,6 +1,9 @@
 package node.system;
 
+import node.PeerReference;
 import node.base.Node;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+import system.network.Connection;
 import system.network.ObjectConnection;
 import util.Common;
 
@@ -40,6 +43,10 @@ public class AsyncProcessNode extends Node {
             System.err.println("Node "+myNodeID+" couldn't establish connection to the System");
             System.exit(Common.EXIT_FAILURE);
         }
+    }
+
+    @Override public Connection connectTo(PeerReference peerReference) {
+        throw new NotImplementedException();
     }
 
     class NodeServer implements Runnable {
