@@ -28,6 +28,7 @@ public abstract class DTLog {
             e.printStackTrace();
         }
     }
+
     void log(String string) {
         try {
             /* SAMPLE LOG

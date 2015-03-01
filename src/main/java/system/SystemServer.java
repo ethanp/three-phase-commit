@@ -1,9 +1,11 @@
 package system;
 
-import system.network.ObjectConnection;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import util.Common;
 
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -28,7 +30,17 @@ public class SystemServer implements Runnable {
         while (true) {
             try {
                 Socket socket = serverSocket.accept();
-                system.addConn(new ObjectConnection(socket));
+                ObjectInputStream ois = new ObjectInputStream(socket.getInputStream());
+                ObjectOutputStream oos = new ObjectOutputStream(socket.getOutputStream());
+                try {
+                    int nodeID = (int) ois.readObject();
+                    int nodeListenPort = (int) ois.readObject();
+                    /* get the node with this id and give it a connection with this info */
+                    throw new NotImplementedException();
+                }
+                catch (ClassNotFoundException e) {
+                    e.printStackTrace();
+                }
             }
             catch (IOException e) {
                 e.printStackTrace();

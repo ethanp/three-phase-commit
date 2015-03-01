@@ -1,10 +1,8 @@
 package node.system;
 
 import messages.Message;
-import node.ParticipantProtocol;
 import node.base.Node;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
-import system.Protocol;
 import system.network.ObjectConnection;
 import util.Common;
 
@@ -13,19 +11,18 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 
+import static util.Common.TXN_MGR_ID;
+
 
 /**
  * Ethan Petuchowski 2/17/15
  */
-public class SystemNode extends Node {
+public class AsyncProcessNode extends Node {
 
-    Protocol protocol;
-    ObjectConnection tmConnection;
     NodeServer nodeServer;
 
-    SystemNode(int systemListenPort, int myNodeID) {
+    AsyncProcessNode(int systemListenPort, int myNodeID) {
         super(myNodeID);
-        protocol = new ParticipantProtocol();
         dtLog = new FileDTLog(new File("logDir", String.valueOf(myNodeID)), this);
 
         /* start local server */
@@ -34,12 +31,12 @@ public class SystemNode extends Node {
 
         /* connect to System */
         try {
-            tmConnection = new ObjectConnection(new Socket(Common.LOCALHOST, systemListenPort));
+            txnMgrConn = new ObjectConnection(new Socket(Common.LOCALHOST, systemListenPort), TXN_MGR_ID);
             System.out.println("Node "+myNodeID+" connected to System");
 
             /* tell the System my ID then my listen port */
-            tmConnection.out.writeInt(myNodeID);
-            tmConnection.out.writeInt(nodeServer.getListenPort());
+//            connection.writeObject(new Integer(myNodeID));
+//            connection.out.writeInt(nodeServer.getListenPort());
         }
         catch (IOException e) {
             System.err.println("Node "+myNodeID+" couldn't establish connection to the System");
@@ -47,7 +44,7 @@ public class SystemNode extends Node {
         }
     }
 
-    @Override public void sendMessage(Message message) {
+    @Override public void sendCoordinatorMessage(Message message) {
         throw new NotImplementedException();
     }
 
@@ -79,6 +76,6 @@ public class SystemNode extends Node {
         int systemListenPort = Integer.parseInt(args[0]);
         int nodeID = Integer.parseInt(args[1]);
         System.out.println("Node "+nodeID);
-        SystemNode node = new SystemNode(systemListenPort, nodeID);
+        AsyncProcessNode node = new AsyncProcessNode(systemListenPort, nodeID);
     }
 }

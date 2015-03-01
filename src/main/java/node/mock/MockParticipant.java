@@ -29,7 +29,7 @@ public class MockParticipant extends Node {
         return sentMessages;
     }
 
-    @Override public void sendMessage(Message message) {
+    @Override public void sendCoordinatorMessage(Message message) {
         sentMessages.add(message);
     }
 }

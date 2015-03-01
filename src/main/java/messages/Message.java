@@ -1,9 +1,11 @@
 package messages;
 
+import java.io.Serializable;
+
 /**
  * Ethan Petuchowski 2/17/15
  */
-public class Message {
+public class Message implements Serializable {
     public Message(Command command, int transactionID) {
         this.command = command;
         this.transactionID = transactionID;

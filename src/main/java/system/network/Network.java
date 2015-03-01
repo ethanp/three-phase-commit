@@ -2,7 +2,7 @@ package system.network;
 
 import system.TransactionManager;
 import messages.Message;
-import system.SystemNodeReference;
+import system.ManagerNodeRef;
 
 import java.util.Collection;
 
@@ -28,7 +28,7 @@ public class Network {
         this.system = system;
     }
 
-    public void send(Message message, SystemNodeReference to) {
+    public void send(Message message, ManagerNodeRef to) {
 
     }
 

@@ -1,17 +1,16 @@
 package node;
 
-import messages.vote_req.AddRequest;
 import messages.CommitRequest;
-import messages.vote_req.DeleteRequest;
 import messages.Message;
 import messages.NoResponse;
 import messages.PrecommitRequest;
-import messages.vote_req.UpdateRequest;
 import messages.YesResponse;
+import messages.vote_req.AddRequest;
+import messages.vote_req.DeleteRequest;
+import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 
 import java.util.Collection;
 
@@ -26,16 +25,19 @@ public class ParticipantStateMachine extends StateMachine {
     /* REFERENCES */
     final Node node;
 
-    /* ATTRIBUTES */
+    /* ONGOING TRANSACTION ATTRIBUTES */
     private int ongoingTransactionID = NO_ONGOING_TRANSACTION;
     private Collection<PeerReference> peerSet = null;
     private boolean precommitted = false;
+
+    // the update being performed
+    private VoteRequest action;
 
     public ParticipantStateMachine(Node node) {
         this.node = node;
     }
 
-    public void receiveMessage(Message msg) {
+    @Override public void receiveMessage(Message msg) {
         switch (msg.getCommand()) {
 
             /* VOTE REQUESTS */
@@ -51,6 +53,7 @@ public class ParticipantStateMachine extends StateMachine {
 
             /* OTHER */
             case DUB_COORDINATOR:
+                receiveDubCoordinator(msg);
                 break;
             case PRE_COMMIT:
                 receivePrecommit((PrecommitRequest) msg);
@@ -65,7 +68,16 @@ public class ParticipantStateMachine extends StateMachine {
         }
     }
 
+    private void receiveDubCoordinator(Message message) {
+        node.becomeCoordinator();
+    }
+
     private void receiveAddRequest(AddRequest addRequest) {
+
+        /* regardless of whether you're going to say yes or no, log the request */
+        node.log(""); /*TODO something */
+
+        /* then respond yes or no */
         if (node.hasSong(addRequest.getSongTuple()))
             respondNo(addRequest);
         else
@@ -86,31 +98,51 @@ public class ParticipantStateMachine extends StateMachine {
             respondNo(deleteRequest);
     }
 
+    /**
+     * doesn't log anything
+     */
     private void receivePrecommit(PrecommitRequest precommitRequest) {
-        if (ongoingTransactionID != precommitRequest.getTransactionID()) {
-            /* TODO what do we do here? */
-            throw new NotImplementedException();
-        }
         setPrecommitted(true);
     }
 
     private void receiveCommit(CommitRequest commitRequest) {
         node.log(commitRequest);
 
-        // TODO perform commit of whatever the request was supposed to DO
-        throw new NotImplementedException();
+        switch (action.getCommand()) {
+            case ADD:
+                commitAdd((AddRequest) action);
+                break;
+            case UPDATE:
+                commitUpdate((UpdateRequest) action);
+                break;
+            case DELETE:
+                commitDelete((DeleteRequest) action);
+                break;
+        }
+        setOngoingTransactionID(NO_ONGOING_TRANSACTION);
+    }
 
-//        setOngoingTransactionID(NO_ONGOING_TRANSACTION);
+    private void commitDelete(DeleteRequest deleteRequest) {
+        node.removeSongWithName(deleteRequest.getSongName());
+    }
+
+    private void commitUpdate(UpdateRequest updateRequest) {
+        node.updateSong(updateRequest.getSongName(), updateRequest.getUpdatedSong());
+    }
+
+    private void commitAdd(AddRequest addRequest) {
+        node.addSong(addRequest.getSongTuple());
     }
 
     /** log ABORT and send NO */
     public void respondNo(Message message) {
         setOngoingTransactionID(NO_ONGOING_TRANSACTION);
         node.log(message.getTransactionID()+" "+Message.Command.ABORT);
-        node.sendMessage(new NoResponse(message));
+        node.sendCoordinatorMessage(new NoResponse(message));
     }
 
     private void respondYes(VoteRequest voteRequest) {
+        action = voteRequest;
         setOngoingTransactionID(voteRequest.getTransactionID());
         setPeerSet(voteRequest.getPeerSet());
         logAndSend(new YesResponse(voteRequest));
@@ -118,7 +150,7 @@ public class ParticipantStateMachine extends StateMachine {
 
     private void logAndSend(Message message) {
         node.log(message);
-        node.sendMessage(message);
+        node.sendCoordinatorMessage(message);
     }
 
     public int getOngoingTransactionID() {

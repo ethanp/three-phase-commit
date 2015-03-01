@@ -1,11 +1,14 @@
 package node;
 
+import system.network.Connection;
+
 /**
  * Ethan Petuchowski 2/27/15
  */
 public class PeerReference {
     final int nodeID;
     int listeningPort;
+    Connection connection;
 
     public PeerReference(int nodeID, int listeningPort) {
         this.nodeID = nodeID;

@@ -1,10 +1,13 @@
 package node.base;
 
 import messages.Message;
+import node.CoordinatorStateMachine;
 import node.ParticipantStateMachine;
-import system.Protocol;
+import system.network.Connection;
 import util.SongTuple;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Set;
 import java.util.TreeSet;
 
@@ -14,22 +17,24 @@ import java.util.TreeSet;
 public abstract class Node {
 
     protected StateMachine stateMachine;
-    Protocol protocol;
-    protected int myNodeID;
+    protected final int myNodeID;
     final Set<SongTuple> playlist = new TreeSet<>();
     protected DTLog dtLog;
+
+    protected Connection txnMgrConn;
+    protected Collection<Connection> peerConns = new ArrayList<>();
 
     public Node(int myNodeID) {
         this.myNodeID = myNodeID;
         stateMachine = new ParticipantStateMachine(this);
     }
 
-    public int getMyNodeID() {
-        return myNodeID;
+    public void addConnection(Connection connection) {
+        peerConns.add(connection);
     }
 
-    public void setMyNodeID(int myNodeID) {
-        this.myNodeID = myNodeID;
+    public int getMyNodeID() {
+        return myNodeID;
     }
 
     public DTLog getDtLog() {
@@ -40,7 +45,7 @@ public abstract class Node {
         this.dtLog = dtLog;
     }
 
-    public abstract void sendMessage(Message message);
+    public abstract void sendCoordinatorMessage(Message message);
 
     public void log(String string) {
         dtLog.log(string);
@@ -60,5 +65,22 @@ public abstract class Node {
 
     public boolean addSong(SongTuple songTuple) {
         return playlist.add(songTuple);
+    }
+
+    public boolean removeSongWithName(String songName) {
+        return playlist.remove(new SongTuple(songName, ""));
+    }
+
+    public void updateSong(String songName, SongTuple updatedSong) {
+        removeSongWithName(songName);
+        addSong(updatedSong);
+    }
+
+    protected void receiveMessage(Message message) {
+        stateMachine.receiveMessage(message);
+    }
+
+    public void becomeCoordinator() {
+        stateMachine = new CoordinatorStateMachine();
     }
 }

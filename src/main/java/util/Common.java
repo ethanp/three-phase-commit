@@ -10,6 +10,7 @@ public class Common {
     public static final int EXIT_FAILURE = 1;
     public static final String LOCALHOST = "127.0.0.1";
     static int reqPort = 3000;
+    public static final int TXN_MGR_ID = 0;
 
     public static ServerSocket claimOpenPort() {
         ServerSocket serverSocket = null;
