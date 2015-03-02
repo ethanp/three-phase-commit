@@ -85,7 +85,7 @@ public abstract class Node {
     }
 
     public void becomeCoordinator() {
-        stateMachine = new CoordinatorStateMachine();
+        stateMachine = new CoordinatorStateMachine(this);
     }
 
     public StateMachine getStateMachine() {
@@ -94,6 +94,10 @@ public abstract class Node {
 
     public Collection<Connection> getPeerConns() {
         return peerConns;
+    }
+    
+    public Connection getPeerConnForId(int id) {
+    	return peerConns.stream().filter(c -> c.getReceiverID() == id).findFirst().get();
     }
 
     public abstract Connection connectTo(PeerReference peerReference);

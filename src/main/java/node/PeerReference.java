@@ -23,10 +23,6 @@ public class PeerReference implements Comparable<PeerReference>, Cloneable {
     public void setListeningPort(int listeningPort) {
         this.listeningPort = listeningPort;
     }
-
-    public void setConnection(Connection conn) {
-    	connection = conn;
-    }
     
     @Override
     public boolean equals(Object o) {

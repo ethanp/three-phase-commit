@@ -11,7 +11,7 @@ import system.network.Connection;
 public abstract class StateMachine {
     private Collection<PeerReference> peerSet = null;
 
-    public Collection<PeerReference> getWorkingPeerSet() {
+    public Collection<PeerReference> getPeerSet() {
         return peerSet;
     }
 

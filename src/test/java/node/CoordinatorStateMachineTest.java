@@ -53,9 +53,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
         	peerQueueSockets[i] = new QueueSocket(peerId, TEST_COORD_ID);
             QueueConnection coordinatorToPeer = peerQueueSockets[i].getConnectionToAID();
             syncNode.addConnection(coordinatorToPeer);
-            PeerReference refToPeer = new PeerReference(peerId, 0);
-            refToPeer.setConnection(coordinatorToPeer);
-            coordinatorPeerReferences.add(refToPeer);
+            coordinatorPeerReferences.add(new PeerReference(peerId, 0));
         }
     }
         

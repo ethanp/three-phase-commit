@@ -1,5 +1,6 @@
 package node;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.concurrent.ThreadPoolExecutor.AbortPolicy;
 
@@ -10,8 +11,11 @@ import messages.CommitRequest;
 import messages.Message;
 import messages.PrecommitRequest;
 import messages.vote_req.VoteRequest;
+import node.base.Node;
 import node.base.StateMachine;
 import system.network.Connection;
+
+import static util.Common.NO_ONGOING_TRANSACTION;
 
 /**
  * Ethan Petuchowski 2/28/15
@@ -24,11 +28,14 @@ public class CoordinatorStateMachine extends StateMachine {
 	}
 	
 	private CoordinatorState state;
+	private Collection<Connection> txnConnections;
+	private Node ownerNode;
 	private int yesVotes;
 	private int ongoingTransactionID;
 	private int acks;
 	
-	public CoordinatorStateMachine() {
+	public CoordinatorStateMachine(Node ownerNode) {
+		this.ownerNode = ownerNode;
 		resetToWaiting();
 	}
 	
@@ -85,28 +92,38 @@ public class CoordinatorStateMachine extends StateMachine {
     public void onTimeout(PeerReference peerReference) {
     	// if we're waiting for a command, a timeout doesn't matter.
     	if (state == CoordinatorState.WaitingForVotes) {
-    		getWorkingPeerSet().remove(peerReference);
+    		getPeerSet().remove(peerReference);
+    		txnConnections.remove(ownerNode.getPeerConnForId(peerReference.nodeID));
     		abortCurrentTransaction();
     	}
     	else if (state == CoordinatorState.WaitingForAcks) {
-    		getWorkingPeerSet().remove(peerReference);
+    		getPeerSet().remove(peerReference);
+    		txnConnections.remove(ownerNode.getPeerConnForId(peerReference.nodeID));
     		checkForEnoughAcks();
     	}
     }
     
     private void resetToWaiting() {
-		ongoingTransactionID = -1;
+		ongoingTransactionID = NO_ONGOING_TRANSACTION;
 		setPeerSet(null);
+		txnConnections = null;
 		state = CoordinatorState.WaitingForCommand;
     }
     
     private void receivePlaylistCommand(VoteRequest message) {
     	// send vote requests to all peers
     	final Collection<PeerReference> peerSet = ((VoteRequest)message).getPeerSet();
-    	setPeerSet(peerSet);
+    	Collection<Connection> conns = new ArrayList<Connection>();
+    	
     	for (PeerReference reference : peerSet) {
-    		reference.connection.sendMessage(message);
+    		Connection conn = ownerNode.getPeerConnForId(reference.nodeID);
+    		conns.add(conn);
+    		conn.sendMessage(message);
     	}
+    	
+    	setPeerSet(peerSet);
+    	txnConnections = conns;
+    	   	
     	state = CoordinatorState.WaitingForVotes;
     	ongoingTransactionID = message.getTransactionID();
     	yesVotes = 0;
@@ -115,29 +132,29 @@ public class CoordinatorStateMachine extends StateMachine {
     
     private void abortCurrentTransaction() {
 		AbortRequest abort = new AbortRequest(ongoingTransactionID);
-		for (PeerReference reference : getWorkingPeerSet()) {
-			reference.connection.sendMessage(abort);
+		for (Connection connection : txnConnections) {
+			connection.sendMessage(abort);
 		}
 		resetToWaiting();    	
     }
     
     private void checkForEnoughYesVotes() {
-    	final Collection<PeerReference> peerSet = getWorkingPeerSet();
+    	final Collection<PeerReference> peerSet = getPeerSet();
     	if (yesVotes >= peerSet.size()) {
     		PrecommitRequest precommit = new PrecommitRequest(ongoingTransactionID);
-    		for (PeerReference reference : peerSet) {
-    			reference.connection.sendMessage(precommit);
+    		for (Connection connection : txnConnections) {
+    			connection.sendMessage(precommit);
     		}
     		state = CoordinatorState.WaitingForAcks;
     	}
     }
     
     private void checkForEnoughAcks() {
-    	final Collection<PeerReference> peerSet = getWorkingPeerSet();
+    	final Collection<PeerReference> peerSet = getPeerSet();
 		if (acks >= peerSet.size()) {
 			CommitRequest commit = new CommitRequest(ongoingTransactionID);
-			for (PeerReference reference : getWorkingPeerSet()) {
-				reference.connection.sendMessage(commit);
+			for (Connection connection : txnConnections) {
+				connection.sendMessage(commit);
 			}
 			resetToWaiting();
 		}
