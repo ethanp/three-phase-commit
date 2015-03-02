@@ -28,7 +28,6 @@ public class ParticipantStateMachine extends StateMachine {
     /* ONGOING TRANSACTION ATTRIBUTES */
     private int ongoingTransactionID = NO_ONGOING_TRANSACTION;
     private VoteRequest action;  // the update being performed
-    private Collection<PeerReference> peerSet = null;
     private boolean precommitted = false;
     private Connection currentConnection = null;
 
@@ -175,13 +174,5 @@ public class ParticipantStateMachine extends StateMachine {
 
     public void setPrecommitted(boolean precommitted) {
         this.precommitted = precommitted;
-    }
-
-    public Collection<PeerReference> getWorkingPeerSet() {
-        return peerSet;
-    }
-
-    public void setPeerSet(Collection<PeerReference> peerSet) {
-        this.peerSet = peerSet;
     }
 }

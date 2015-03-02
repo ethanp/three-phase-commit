@@ -1,5 +1,15 @@
 package node;
 
+import java.util.Collection;
+import java.util.concurrent.ThreadPoolExecutor.AbortPolicy;
+
+import javax.management.RuntimeErrorException;
+
+import messages.AbortRequest;
+import messages.CommitRequest;
+import messages.Message;
+import messages.PrecommitRequest;
+import messages.vote_req.VoteRequest;
 import node.base.StateMachine;
 import system.network.Connection;
 
@@ -7,32 +17,129 @@ import system.network.Connection;
  * Ethan Petuchowski 2/28/15
  */
 public class CoordinatorStateMachine extends StateMachine {
+	public enum CoordinatorState {
+		WaitingForCommand,
+		WaitingForVotes, 
+		WaitingForAcks,
+	}
+	
+	private CoordinatorState state;
+	private int yesVotes;
+	private int ongoingTransactionID;
+	private int acks;
+	
+	public CoordinatorStateMachine() {
+		resetToWaiting();
+	}
+	
+	public CoordinatorState getState() {
+		return state;
+	}
+	
     @Override public boolean receiveMessage(Connection overConnection) {
-        switch (overConnection.receiveMessage().getCommand()) {
-
-            case DUB_COORDINATOR:
-                break;
-            case VOTE_REQ:
-                break;
-            case PRE_COMMIT:
-                break;
-            case COMMIT:
-                break;
-            case ABORT:
-                break;
+    	Message message = overConnection.receiveMessage();
+    	if (message == null) {
+    		return false;
+    	}
+    	
+        switch (message.getCommand()) {
+	        case ADD:
+            case UPDATE:
+            case DELETE:
+            	if (state == CoordinatorState.WaitingForCommand) {
+            		receivePlaylistCommand((VoteRequest)message);
+            		break;
+            	}
+            	else
+            		throw new RuntimeException("Received command when not waiting for one");
             case YES:
+            	if (state == CoordinatorState.WaitingForVotes) {
+	            	++yesVotes;
+	            	checkForEnoughYesVotes();
+            	}
+            	else
+            		throw new RuntimeException("Received Yes vote when not waiting for one");
                 break;
             case NO:
+            	if (state == CoordinatorState.WaitingForVotes) {
+            		abortCurrentTransaction();
+            	}
+            	else
+            		throw new RuntimeException("Received No vote when not waiting for one");
                 break;
             case ACK:
+            	if (state == CoordinatorState.WaitingForAcks) {
+            		++acks;
+            		checkForEnoughAcks();
+            	}
+            	else
+            		throw new RuntimeException("Received ACK when not waiting for one");
                 break;
-            case ADD:
-                break;
-            case UPDATE:
-                break;
-            case DELETE:
-                break;
+                
+            default:
+                throw new RuntimeException("invalid message for coordinator");            
         }
         return true;
+    }
+    
+    public void onTimeout(PeerReference peerReference) {
+    	// if we're waiting for a command, a timeout doesn't matter.
+    	if (state == CoordinatorState.WaitingForVotes) {
+    		getWorkingPeerSet().remove(peerReference);
+    		abortCurrentTransaction();
+    	}
+    	else if (state == CoordinatorState.WaitingForAcks) {
+    		getWorkingPeerSet().remove(peerReference);
+    		checkForEnoughAcks();
+    	}
+    }
+    
+    private void resetToWaiting() {
+		ongoingTransactionID = -1;
+		setPeerSet(null);
+		state = CoordinatorState.WaitingForCommand;
+    }
+    
+    private void receivePlaylistCommand(VoteRequest message) {
+    	// send vote requests to all peers
+    	final Collection<PeerReference> peerSet = ((VoteRequest)message).getPeerSet();
+    	setPeerSet(peerSet);
+    	for (PeerReference reference : peerSet) {
+    		reference.connection.sendMessage(message);
+    	}
+    	state = CoordinatorState.WaitingForVotes;
+    	ongoingTransactionID = message.getTransactionID();
+    	yesVotes = 0;
+    	acks = 0;
+    }
+    
+    private void abortCurrentTransaction() {
+		AbortRequest abort = new AbortRequest(ongoingTransactionID);
+		for (PeerReference reference : getWorkingPeerSet()) {
+			reference.connection.sendMessage(abort);
+		}
+		resetToWaiting();    	
+    }
+    
+    private void checkForEnoughYesVotes() {
+    	final Collection<PeerReference> peerSet = getWorkingPeerSet();
+    	if (yesVotes >= peerSet.size()) {
+    		PrecommitRequest precommit = new PrecommitRequest(ongoingTransactionID);
+    		for (PeerReference reference : peerSet) {
+    			reference.connection.sendMessage(precommit);
+    		}
+    		state = CoordinatorState.WaitingForAcks;
+    	}
+    }
+    
+    private void checkForEnoughAcks() {
+    	final Collection<PeerReference> peerSet = getWorkingPeerSet();
+		if (acks >= peerSet.size()) {
+			CommitRequest commit = new CommitRequest(ongoingTransactionID);
+			for (PeerReference reference : getWorkingPeerSet()) {
+				reference.connection.sendMessage(commit);
+			}
+			resetToWaiting();
+		}
     }
 }

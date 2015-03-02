@@ -27,6 +27,10 @@ public class PeerReference {
         this.listeningPort = listeningPort;
     }
 
+    public void setConnection(Connection conn) {
+    	connection = conn;
+    }
+    
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
