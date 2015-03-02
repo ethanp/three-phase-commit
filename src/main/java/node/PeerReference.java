@@ -1,14 +1,11 @@
 package node;
 
-import system.network.Connection;
-
 /**
  * Ethan Petuchowski 2/27/15
  */
-public class PeerReference {
-    final int nodeID;
-    int listeningPort;
-    Connection connection;
+public class PeerReference implements Comparable<PeerReference>, Cloneable {
+    protected final int nodeID;
+    protected int listeningPort;
 
     public PeerReference(int nodeID, int listeningPort) {
         this.nodeID = nodeID;
@@ -46,5 +43,13 @@ public class PeerReference {
         int result = nodeID;
         result = 31*result+listeningPort;
         return result;
+    }
+
+    @Override public int compareTo(PeerReference o) {
+        return getNodeID()-o.getNodeID();
+    }
+
+    public PeerReference clone() {
+        return new PeerReference(getNodeID(), getListeningPort());
     }
 }

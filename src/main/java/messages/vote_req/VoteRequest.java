@@ -4,6 +4,7 @@ import messages.Message;
 import node.PeerReference;
 
 import java.util.Collection;
+import java.util.stream.Collectors;
 
 /**
  * Ethan Petuchowski 2/27/15
@@ -19,6 +20,10 @@ public abstract class VoteRequest extends Message {
 
     public Collection<PeerReference> getPeerSet() {
         return peerSet;
+    }
+
+    public Collection<PeerReference> getCloneOfPeerSet() {
+        return getPeerSet().stream().map(PeerReference::clone).collect(Collectors.toList());
     }
 
     public String getPeerSetLogString() {

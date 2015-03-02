@@ -7,14 +7,16 @@ import java.util.Collection;
 
 /**
  * Ethan Petuchowski 2/27/15
+ *
+ * "change the name and/or url of a given song tuple"
  */
 public class UpdateRequest extends VoteRequest {
 
     String songName;
     SongTuple updatedSong;
 
-    public UpdateRequest(String songName, SongTuple updatedSong, int msgId, Collection<PeerReference> peerSet) {
-        super(Command.UPDATE, msgId, peerSet);
+    public UpdateRequest(String songName, SongTuple updatedSong, int transactionID, Collection<PeerReference> peerSet) {
+        super(Command.UPDATE, transactionID, peerSet);
         this.songName = songName;
         this.updatedSong = updatedSong;
     }

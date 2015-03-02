@@ -2,6 +2,7 @@ package node.base;
 
 import node.CoordinatorStateMachine;
 import node.ParticipantStateMachine;
+import node.PeerReference;
 import system.network.Connection;
 import util.SongTuple;
 
@@ -49,8 +50,17 @@ public abstract class Node {
         dtLog.log(string);
     }
 
-    public boolean hasSong(SongTuple tuple) {
+    public boolean hasSongTupleWithName(SongTuple tuple) {
         return playlist.contains(tuple);
+    }
+
+    public boolean hasExactSongTuple(SongTuple tuple) {
+        for (SongTuple songTuple : playlist) {
+            if (songTuple.toLogString().equals(tuple.toLogString())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean hasSong(String name) {
@@ -81,4 +91,10 @@ public abstract class Node {
     public StateMachine getStateMachine() {
         return stateMachine;
     }
+
+    public Collection<Connection> getPeerConns() {
+        return peerConns;
+    }
+
+    public abstract Connection connectTo(PeerReference peerReference);
 }
