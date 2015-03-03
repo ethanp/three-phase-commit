@@ -1,5 +1,7 @@
 package node.base;
 
+import messages.Message;
+import messages.TokenWriter;
 import node.CoordinatorStateMachine;
 import node.ParticipantStateMachine;
 import node.PeerReference;
@@ -45,11 +47,13 @@ public abstract class Node {
     public void setDtLog(DTLog dtLog) {
         this.dtLog = dtLog;
     }
-
-    public void log(String string) {
-        dtLog.log(string);
+    
+    public void logMessage(Message message) {
+    	TokenWriter writer = dtLog.beginLog();
+        Message.writeMessage(message, writer);
+        dtLog.endLog(writer);
     }
-
+    
     public boolean hasSongTupleWithName(SongTuple tuple) {
         return playlist.contains(tuple);
     }

@@ -9,12 +9,12 @@ import javax.management.RuntimeErrorException;
 import messages.AbortRequest;
 import messages.CommitRequest;
 import messages.Message;
+import messages.PeerTimeout;
 import messages.PrecommitRequest;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
 import system.network.Connection;
-
 import static util.Common.NO_ONGOING_TRANSACTION;
 
 /**
@@ -82,14 +82,18 @@ public class CoordinatorStateMachine extends StateMachine {
             	else
             		throw new RuntimeException("Received ACK when not waiting for one");
                 break;
-                
+            case TIMEOUT:
+            	int peerID = ((PeerTimeout)message).getPeerId();
+            	PeerReference ref = getPeerSet().stream().filter(pr -> pr.nodeID == peerID).findFirst().get();
+            	onTimeout(ref);
+            	break;
             default:
                 throw new RuntimeException("invalid message for coordinator");            
         }
         return true;
     }
     
-    public void onTimeout(PeerReference peerReference) {
+    private void onTimeout(PeerReference peerReference) {
     	// if we're waiting for a command, a timeout doesn't matter.
     	if (state == CoordinatorState.WaitingForVotes) {
     		getPeerSet().remove(peerReference);
@@ -115,6 +119,7 @@ public class CoordinatorStateMachine extends StateMachine {
     	final Collection<PeerReference> peerSet = ((VoteRequest)message).getPeerSet();
     	Collection<Connection> conns = new ArrayList<Connection>();
     	
+    	ownerNode.logMessage(message);
     	for (PeerReference reference : peerSet) {
     		Connection conn = ownerNode.getPeerConnForId(reference.nodeID);
     		conns.add(conn);
@@ -132,6 +137,7 @@ public class CoordinatorStateMachine extends StateMachine {
     
     private void abortCurrentTransaction() {
 		AbortRequest abort = new AbortRequest(ongoingTransactionID);
+		ownerNode.logMessage(abort);
 		for (Connection connection : txnConnections) {
 			connection.sendMessage(abort);
 		}
@@ -153,6 +159,7 @@ public class CoordinatorStateMachine extends StateMachine {
     	final Collection<PeerReference> peerSet = getPeerSet();
 		if (acks >= peerSet.size()) {
 			CommitRequest commit = new CommitRequest(ongoingTransactionID);
+			ownerNode.logMessage(commit);
 			for (Connection connection : txnConnections) {
 				connection.sendMessage(commit);
 			}

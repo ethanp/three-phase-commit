@@ -1,5 +1,7 @@
 package messages.vote_req;
 
+import messages.TokenReader;
+import messages.TokenWriter;
 import node.PeerReference;
 import util.SongTuple;
 
@@ -32,4 +34,20 @@ public class UpdateRequest extends VoteRequest {
     @Override protected String actionLogString() {
         return songName+"\n"+updatedSong.toLogString();
     }
+
+	@Override
+	protected void writeAsTokens(TokenWriter writer) {
+		writer.writeToken(new Integer(transactionID).toString());
+		writePeerSetAsTokens(writer);
+		writer.writeToken(songName);		
+		updatedSong.writeAsTokens(writer);
+	}
+
+	@Override
+	protected void readFromTokens(TokenReader reader) {
+		transactionID = Integer.parseInt(reader.readToken());
+		readPeerSetAsTokens(reader);
+		songName = reader.readToken();
+		updatedSong = SongTuple.readFromTokens(reader);
+	}
 }

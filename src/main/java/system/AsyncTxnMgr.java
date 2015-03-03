@@ -1,5 +1,6 @@
 package system;
 
+import messages.DubCoordinatorMessage;
 import messages.Message;
 import node.system.AsyncProcessNode;
 import system.network.ObjectConnection;
@@ -81,6 +82,6 @@ public class AsyncTxnMgr extends TransactionManager {
         network.applyConnectivity();
 
         /* dub someone Coordinator */
-        network.send(new Message(Message.Command.DUB_COORDINATOR, 1), nodes.get(0));
+        network.send(new DubCoordinatorMessage(), nodes.get(0));
     }
 }

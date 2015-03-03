@@ -1,8 +1,11 @@
 package messages.vote_req;
 
 import messages.Message;
+import messages.TokenReader;
+import messages.TokenWriter;
 import node.PeerReference;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
@@ -36,10 +39,25 @@ public abstract class VoteRequest extends Message {
         }
         return sb.toString();
     }
-
-    @Override public String toLogString() {
-        return super.toLogString()+"\n"+actionLogString()+"\n"+
-               getPeerSetLogString()+"\n";
+    
+    protected void writePeerSetAsTokens(TokenWriter writer) {
+    	writer.writeToken(new Integer(peerSet.size()).toString());
+        for (PeerReference peer : peerSet) {
+            writer.writeToken(new Integer(peer.getNodeID()).toString());
+            writer.writeToken(new Integer(peer.getListeningPort()).toString());
+        }
+    }
+    
+    protected void readPeerSetAsTokens(TokenReader reader) {
+    	int size = Integer.parseInt(reader.readToken());
+    	ArrayList<PeerReference> peers = new ArrayList<PeerReference>();
+    	for (int i = 0; i < size; ++i) {
+    		PeerReference peer = new PeerReference(
+    				Integer.parseInt(reader.readToken()), 
+    				Integer.parseInt(reader.readToken()));
+    		peers.add(peer);
+    	}
+    	peerSet = peers;
     }
 
     protected abstract String actionLogString();

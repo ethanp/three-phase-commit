@@ -1,5 +1,6 @@
 package system;
 
+import messages.DubCoordinatorMessage;
 import messages.Message;
 import messages.vote_req.AddRequest;
 import messages.vote_req.VoteRequest;
@@ -73,7 +74,7 @@ public abstract class TransactionManager {
 
     public void dubCoordinator(int nodeID) {
         final ManagerNodeRef newCoord = remoteNodeWithID(nodeID);
-        newCoord.sendMessage(new Message(Message.Command.DUB_COORDINATOR, -1));
+        newCoord.sendMessage(new DubCoordinatorMessage());
         coordinator = newCoord;
     }
 }

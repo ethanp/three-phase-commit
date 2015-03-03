@@ -1,15 +1,22 @@
 package node;
 
+import messages.AbortRequest;
 import messages.CommitRequest;
+import messages.DubCoordinatorMessage;
+import messages.ElectedMessage;
 import messages.Message;
+import messages.PeerTimeout;
 import messages.PrecommitRequest;
+import messages.YesResponse;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.system.SyncNode;
+
 import org.junit.Before;
 import org.junit.Test;
+
 import system.network.Connection;
 import system.network.QueueConnection;
 import system.network.QueueSocket;
@@ -19,6 +26,8 @@ import util.TestCommon;
 import java.util.Iterator;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
+
+import javax.jws.Oneway;
 
 import static messages.Message.Command.ABORT;
 import static messages.Message.Command.ACK;
@@ -102,12 +111,12 @@ public class ParticipantStateMachineTest extends TestCommon {
         * */
 
         /* assert log format is correct */
-        final String[] logLines = syncNode.getDtLog().getLogAsString().split("\n");
-        assertThat(logLines[0], containsString("ADD "+TXID));
-        assertThat(logLines[1], containsString(A_SONG_NAME));
-        assertThat(logLines[2], containsString(A_URL));
-        assertThat(logLines[3], containsString("PEERS 3 2 2 3 3 4 4"));
-        assertThat(logLines[4], containsString("YES"));
+        Object[] messages = syncNode.getDtLog().getLoggedMessages().toArray();
+        AddRequest add = (AddRequest)messages[0];
+        assertTrue(add != null);
+        assertEquals(A_SONG_TUPLE, add.getSongTuple());
+        YesResponse yes = (YesResponse)messages[1];
+        assertTrue(yes != null);
 
         /* assert that it was sent to the coordinator */
         assertEquals(1, peerToCoordinator.getOutQueue().size());
@@ -130,12 +139,12 @@ public class ParticipantStateMachineTest extends TestCommon {
         testReceiveFromCoordinator(msg);
 
         /* assert log format is correct */
-        final String[] logLines = syncNode.getDtLog().getLogAsString().split("\n");
-        assertThat(logLines[0], containsString("ADD "+TXID));
-        assertThat(logLines[1], containsString(A_SONG_NAME));
-        assertThat(logLines[2], containsString(A_URL));
-        assertThat(logLines[3], containsString("PEERS 3 2 2 3 3 4 4"));
-        assertThat(logLines[4], containsString("ABORT"));
+        Object[] messages = syncNode.getDtLog().getLoggedMessages().toArray();
+        AddRequest add = (AddRequest)messages[0];
+        assertTrue(add != null);
+        assertEquals(A_SONG_TUPLE, add.getSongTuple());
+        AbortRequest abort = (AbortRequest)messages[1];
+        assertTrue(abort != null);
 
         assertStateAfterNOSentToCoordinator();
     }
@@ -186,13 +195,12 @@ public class ParticipantStateMachineTest extends TestCommon {
          */
 
         /* assert log state */
-        final String[] logLines = syncNode.getDtLog().getLogAsString().split("\n");
-        assertThat(logLines[0], containsString("UPDATE "+TXID));
-        assertThat(logLines[1], containsString(A_SONG_NAME));
-        assertThat(logLines[2], containsString(A_SONG_NAME));
-        assertThat(logLines[3], containsString(DIFFERENT_URL));
-        assertThat(logLines[4], containsString("PEERS 3 2 2 3 3 4 4"));
-        assertThat(logLines[5], containsString("YES"));
+        Object[] messages = syncNode.getDtLog().getLoggedMessages().toArray();
+        UpdateRequest update = (UpdateRequest)messages[0];
+        assertTrue(update != null);
+        assertEquals(A_SONG_NAME, update.getSongName());
+        YesResponse yes = (YesResponse)messages[1];
+        assertTrue(yes != null);
 
         /* assert channel state and node states are correct */
         assertStateAfterYESSentToCoordinator();
@@ -216,11 +224,12 @@ public class ParticipantStateMachineTest extends TestCommon {
          */
 
         /* assert log state */
-        final String[] logLines = syncNode.getDtLog().getLogAsString().split("\n");
-        assertThat(logLines[0], containsString("DELETE "+TXID));
-        assertThat(logLines[1], containsString(A_SONG_NAME));
-        assertThat(logLines[2], containsString("PEERS 3 2 2 3 3 4 4"));
-        assertThat(logLines[3], containsString("YES"));
+        Object[] messages = syncNode.getDtLog().getLoggedMessages().toArray();
+        DeleteRequest delete = (DeleteRequest)messages[0];
+        assertTrue(delete != null);
+        assertEquals(A_SONG_NAME, delete.getSongName());
+        YesResponse yes = (YesResponse)messages[1];
+        assertTrue(yes != null);
 
         /* assert channel state and node states are correct */
         assertStateAfterYESSentToCoordinator();
@@ -330,7 +339,7 @@ public class ParticipantStateMachineTest extends TestCommon {
         psm.setPeerSet(A_PEER_REFS);
 
         /* receive abort msg */
-        final Message msg = new Message(ABORT, TXID);
+        final Message msg = new AbortRequest(TXID);
         testReceiveFromCoordinator(msg);
 
         /* assert correct resulting state */
@@ -354,14 +363,14 @@ public class ParticipantStateMachineTest extends TestCommon {
         int nextCoordID = queue.poll().getNodeID();
 
         /* timeout has triggered */
+        psm.setCoordinatorID(coordinatorID);
         psm.setPeerSet(A_PEER_REFS);
         int peerRefsInitialSize = A_PEER_REFS.size();
         psm.setUpSet(psm.getPeerSet().stream().map(PeerReference::clone).collect(Collectors.toList()));
         psm.setOngoingTransactionID(TXID);
 
-        psm.coordinatorTimeoutOnHeartbeat(coordinatorID);
-
-
+        testReceiveFromCoordinator(new PeerTimeout(coordinatorID));
+        
         /* so the following state changes have occurred */
 
         /* failed coordinator was removed from upSet but not peerSet */
@@ -369,7 +378,8 @@ public class ParticipantStateMachineTest extends TestCommon {
         assertEquals(peerRefsInitialSize, psm.getPeerSet().size());
 
         /* this fact was logged */
-        assertThat(syncNode.getDtLog().getLogAsString(), containsString("TIMEOUT "+coordinatorID));
+        Message lastLoggedMessage = (Message)syncNode.getDtLog().getLoggedMessages().toArray()[0];
+        assertTrue(lastLoggedMessage instanceof PeerTimeout);
 
         /* connection established to the lowest node still in upSet */
         Iterator<Connection> connectionIterator = syncNode.getPeerConns().iterator();
@@ -394,7 +404,7 @@ public class ParticipantStateMachineTest extends TestCommon {
     @Test
     public void testReceiveUR_ELECTED() throws Exception {
 
-        testReceiveFromCoordinator(new Message(UR_ELECTED, TXID));
+        testReceiveFromCoordinator(new ElectedMessage(TXID));
 
         assertTrue(syncNode.getStateMachine() instanceof CoordinatorStateMachine);
 
@@ -404,7 +414,7 @@ public class ParticipantStateMachineTest extends TestCommon {
 
     @Test
     public void testReceiveDUB_COORDINATOR() throws Exception {
-        testReceiveFromCoordinator(new Message(DUB_COORDINATOR, -1));
+        testReceiveFromCoordinator(new DubCoordinatorMessage());
         assertTrue(syncNode.getStateMachine() instanceof CoordinatorStateMachine);
     }
 }

@@ -5,9 +5,13 @@ import static org.junit.Assert.*;
 import java.util.ArrayList;
 import java.util.Queue;
 
+import messages.AbortRequest;
 import messages.AckRequest;
+import messages.CommitRequest;
+import messages.DubCoordinatorMessage;
 import messages.Message;
 import messages.NoResponse;
+import messages.PeerTimeout;
 import messages.YesResponse;
 import messages.Message.Command;
 import messages.vote_req.AddRequest;
@@ -42,7 +46,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
         coordinatorToTxnMgr = txnMgrQueueSocket.getConnectionToBID();
         syncNode.addConnection(coordinatorToTxnMgr);
         
-        txnMgrToCoordinator.sendMessage(new Message(Command.DUB_COORDINATOR, -1));
+        txnMgrToCoordinator.sendMessage(new DubCoordinatorMessage());
         syncNode.getStateMachine().receiveMessage(coordinatorToTxnMgr);        
         csm = (CoordinatorStateMachine)syncNode.getStateMachine();
         
@@ -80,6 +84,11 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		assertTrue(csm.receiveMessage(peerQueueSockets[peerIndex].getConnectionToAID()));
     }
     
+    private void peerTimesOut(int peerIndex) {
+		peerQueueSockets[peerIndex].getConnectionToBID().sendMessage(new PeerTimeout(peerIndex + 2));
+		assertTrue(csm.receiveMessage(peerQueueSockets[peerIndex].getConnectionToAID()));
+    }
+    
     private Message getLastMessageToPeer(int peerIndex) {
     	Message message;
     	Queue<Message> queue = peerQueueSockets[peerIndex].getConnectionToBID().getInQueue();
@@ -87,6 +96,11 @@ public class CoordinatorStateMachineTest extends TestCommon {
     		message = queue.poll();
     	} while (queue.size() > 0);
     	return message;
+    }
+    
+    private Message getLastMessageLogged() {
+        Object[] messages = syncNode.getDtLog().getLoggedMessages().toArray();
+        return (Message)messages[messages.length - 1];
     }
     
 	@Test
@@ -98,6 +112,8 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		assertEquals(request, voteReq);
 		voteReq = getLastMessageToPeer(1);
 		assertEquals(request, voteReq);
+		Message logged = getLastMessageLogged();
+		assertTrue(logged instanceof AddRequest);
 	}
 
 	@Test
@@ -124,11 +140,13 @@ public class CoordinatorStateMachineTest extends TestCommon {
 	@Test
 	public void testTimeoutWhileWaitingForVotes_sendsAbortAndReturnsToInitialState() {
 		receiveCommandFromTransactionManager();
-		csm.onTimeout(coordinatorPeerReferences.get(0));
+		peerTimesOut(0);
 		
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
 		Message abort = getLastMessageToPeer(1);
 		assertEquals(Message.Command.ABORT, abort.getCommand());
+		Message logged = getLastMessageLogged();
+		assertTrue(logged instanceof AbortRequest);
 	}
 	
 	@Test
@@ -141,6 +159,8 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		assertEquals(Message.Command.ABORT, abort.getCommand());
 		abort = getLastMessageToPeer(1);
 		assertEquals(Message.Command.ABORT, abort.getCommand());
+		Message logged = getLastMessageLogged();
+		assertTrue(logged instanceof AbortRequest);
 	}
 	
 	@Test
@@ -166,6 +186,8 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		assertEquals(Message.Command.COMMIT, commit.getCommand());
 		commit = getLastMessageToPeer(1);
 		assertEquals(Message.Command.COMMIT, commit.getCommand());
+		Message logged = getLastMessageLogged();
+		assertTrue(logged instanceof CommitRequest);
 	}	
 	
 	@Test
@@ -174,10 +196,12 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		peerRespondsWithYes(0);
 		peerRespondsWithYes(1);
 		peerAcknowledgesPrecommit(0);
-		csm.onTimeout(coordinatorPeerReferences.get(1));
+		peerTimesOut(1);
 
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
 		Message commit = getLastMessageToPeer(0);
 		assertEquals(Message.Command.COMMIT, commit.getCommand());
+		Message logged = getLastMessageLogged();
+		assertTrue(logged instanceof CommitRequest);
 	}
 }

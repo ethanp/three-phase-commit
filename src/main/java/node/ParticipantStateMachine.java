@@ -1,9 +1,14 @@
 package node;
 
+import messages.AbortRequest;
+import messages.AckRequest;
 import messages.CommitRequest;
+import messages.ElectedMessage;
 import messages.Message;
 import messages.NoResponse;
+import messages.PeerTimeout;
 import messages.PrecommitRequest;
+import messages.TokenWriter;
 import messages.YesResponse;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
@@ -34,7 +39,8 @@ public class ParticipantStateMachine extends StateMachine {
     private Collection<PeerReference> upSet = null;
     private boolean precommitted = false;
     private Connection currentConnection = null;
-
+    private int coordinatorId;
+    
     public ParticipantStateMachine(Node node) {
         this.node = node;
     }
@@ -77,6 +83,9 @@ public class ParticipantStateMachine extends StateMachine {
             case UR_ELECTED:
                 receiveUR_ELECTED(msg);
                 break;
+            case TIMEOUT:
+            	onTimeout((PeerTimeout)msg);
+            	break;
             default:
                 throw new RuntimeException("Not a valid message: "+msg.getCommand());
         }
@@ -89,7 +98,7 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     private void receiveAbort(Message message) {
-        node.log("ABORT");
+        node.logMessage(message);
         action = null;
         setPeerSet(null);
         setUpSet(null);
@@ -101,7 +110,8 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     private void receiveVoteRequest(VoteRequest voteRequest, boolean voteValue) {
-        node.log(voteRequest.toLogString());
+    	setCoordinatorID(currentConnection.getReceiverID());
+    	node.logMessage(voteRequest);        
         if (voteValue) {
             respondYESToVoteRequest(voteRequest);
         }
@@ -128,14 +138,11 @@ public class ParticipantStateMachine extends StateMachine {
     private void receivePrecommit(PrecommitRequest precommitRequest) {
         setPrecommitted(true);
         currentConnection.sendMessage(
-                new Message(
-                        Message.Command.ACK,
-                        getOngoingTransactionID()));
+                new AckRequest(getOngoingTransactionID()));
     }
 
     private void receiveCommit(CommitRequest commitRequest) {
-        node.log("COMMIT");
-
+        node.logMessage(commitRequest);
         switch (action.getCommand()) {
             case ADD:
                 commitAdd((AddRequest) action);
@@ -164,7 +171,7 @@ public class ParticipantStateMachine extends StateMachine {
 
     public void respondNOToVoteRequest(Message message) {
         setOngoingTransactionID(NO_ONGOING_TRANSACTION);
-        node.log(message.getTransactionID()+" "+Message.Command.ABORT);
+        node.logMessage(new AbortRequest(message.getTransactionID()));
         currentConnection.sendMessage(new NoResponse(message));
     }
 
@@ -177,7 +184,7 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     private void logAndSend(Message message) {
-        node.log(message.getCommand().toString());
+        node.logMessage(message);
         currentConnection.sendMessage(message);
     }
 
@@ -200,7 +207,10 @@ public class ParticipantStateMachine extends StateMachine {
         this.precommitted = precommitted;
     }
 
-
+    public void setCoordinatorID(int coordinatorID) {
+    	this.coordinatorId = coordinatorID;
+    }
+    
     public Collection<PeerReference> getUpSet() {
         return upSet;
     }
@@ -217,12 +227,14 @@ public class ParticipantStateMachine extends StateMachine {
         this.action = action;
     }
 
-    public void coordinatorTimeoutOnHeartbeat(int coordinatorID) {
-        node.log("TIMEOUT "+coordinatorID);
-        removeNodeWithIDFromUpset(coordinatorID);
-        PeerReference lowestRemainingID = getNodeWithLowestIDInUpset();
-        Connection conn = node.connectTo(lowestRemainingID);
-        conn.sendMessage(new Message(UR_ELECTED, getOngoingTransactionID()));
+    private void onTimeout(PeerTimeout timeout) {
+    	if (timeout.getPeerId() == coordinatorId) {
+	    	node.logMessage(timeout);
+	        removeNodeWithIDFromUpset(timeout.getPeerId());
+	        PeerReference lowestRemainingID = getNodeWithLowestIDInUpset();
+	        Connection conn = node.connectTo(lowestRemainingID);
+	        conn.sendMessage(new ElectedMessage(ongoingTransactionID));
+    	}
     }
 
     private PeerReference getNodeWithLowestIDInUpset() {
