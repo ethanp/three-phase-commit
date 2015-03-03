@@ -21,5 +21,5 @@ public class TestCommon {
     public final static SongTuple A_SONG_TUPLE = new SongTuple(A_SONG_NAME, A_URL);
     public final static SongTuple SAME_SONG_NEW_URL = new SongTuple(A_SONG_NAME, DIFFERENT_URL);
     public static final int TEST_PEER_ID = 2;
-    public static final int TEST_COORD_ID = 2;
+    public static final int TEST_COORD_ID = 1;
 }

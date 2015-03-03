@@ -51,13 +51,13 @@ public abstract class Node {
     public void setDtLog(DTLog dtLog) {
         this.dtLog = dtLog;
     }
-    
+
     public void logMessage(Message message) {
     	TokenWriter writer = dtLog.beginLog();
         Message.writeMessage(message, writer);
         dtLog.endLog(writer);
     }
-    
+
     public boolean hasSongTupleWithName(SongTuple tuple) {
         return playlist.contains(tuple);
     }
@@ -155,5 +155,9 @@ public abstract class Node {
         return peerConns.stream()
                         .filter(conn -> conn.getReceiverID() == reference.getNodeID())
                         .count() > 0;
+    }
+
+    public void setPeerConns(Collection<Connection> peerConns) {
+        this.peerConns = peerConns;
     }
 }

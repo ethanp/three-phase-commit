@@ -14,6 +14,9 @@ import util.TestCommon;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static messages.Message.Command.ABORT;
+import static messages.Message.Command.COMMIT;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -41,17 +44,18 @@ public class SynchronousSystemTest extends TestCommon {
     @Test
     public void testAddRequest() throws Exception {
         VoteRequest addRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
-        assertTrue(system.processRequestToCompletion(addRequest));
+        assertEquals(COMMIT, system.processRequestToCompletion(addRequest).getCommand());
+
+        assertTrue(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
     public void testParticipantHasUpdatedSongAfterAddAndUpdateRequests() throws Exception {
         VoteRequest add = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
-        assertTrue(system.processRequestToCompletion(add));
+        assertEquals(COMMIT, system.processRequestToCompletion(add).getCommand());
         VoteRequest up = new UpdateRequest(A_SONG_NAME, SAME_SONG_NEW_URL, TXID+1, peerReferences);
-        assertTrue(system.processRequestToCompletion(up));
+        assertEquals(COMMIT, system.processRequestToCompletion(up).getCommand());
 
-        SyncNode participant = ((SyncManagerNodeRef) system.txnMgr.getNodes().get(1)).getNode();
         assertFalse(participant.hasExactSongTuple(A_SONG_TUPLE));
         assertTrue(participant.hasExactSongTuple(SAME_SONG_NEW_URL));
     }
@@ -59,9 +63,11 @@ public class SynchronousSystemTest extends TestCommon {
     @Test
     public void testParticipantDoesNotHaveSongAfterAddAndDeleteRequests() throws Exception {
         VoteRequest addRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
-        assertTrue(system.processRequestToCompletion(addRequest));
+        assertEquals(COMMIT, system.processRequestToCompletion(addRequest).getCommand());
         VoteRequest deleteRequest = new DeleteRequest(A_SONG_NAME, TXID+1, peerReferences);
-        assertTrue(system.processRequestToCompletion(deleteRequest));
+        assertEquals(COMMIT, system.processRequestToCompletion(deleteRequest).getCommand());
+
+        assertFalse(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
@@ -71,7 +77,12 @@ public class SynchronousSystemTest extends TestCommon {
 
     @Test
     public void testReceiveAbortWhenAddingExistingSong() throws Exception {
-        throw new NotImplementedException();
+        VoteRequest addRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
+        assertEquals(COMMIT, system.processRequestToCompletion(addRequest).getCommand());
+        VoteRequest repeatReq = new AddRequest(A_SONG_TUPLE, TXID+1, peerReferences);
+        assertEquals(ABORT, system.processRequestToCompletion(repeatReq).getCommand());
+
+        assertTrue(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
