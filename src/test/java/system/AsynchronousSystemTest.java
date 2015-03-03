@@ -8,7 +8,6 @@ import node.PeerReference;
 import node.system.SyncNode;
 import org.junit.Before;
 import org.junit.Test;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import util.TestCommon;
 
 import java.util.List;
@@ -23,9 +22,10 @@ public class AsynchronousSystemTest extends TestCommon {
     AsynchronousSystem system;
     List<PeerReference> peerReferences;
 
+
     @Before
     public void setUp() throws Exception {
-        system = new AsynchronousSystem(5);
+        system = new AsynchronousSystem(2);
 
         List<ManagerNodeRef> nodes = system.txnMgr.getNodes();
 
@@ -33,13 +33,10 @@ public class AsynchronousSystemTest extends TestCommon {
                               .map(mgrNode -> mgrNode.asPeerNode())
                               .collect(Collectors.toList());
 
-        waitForNodesToConnectToTxnMgr();
-    }
-
-    private void waitForNodesToConnectToTxnMgr() {
-        /* TODO I'm thinking this needs to be an "observer" of whenever the event
-           occurs that the AsyncTxnMgr hasAllNodeConnections */
-        throw new NotImplementedException();
+        while (system.txnMgr.coordinator == null) {
+            system.txnMgr.coordinatorChosen.await();
+        }
+        System.out.println("JUnit test thinks a coordinator has been chosen");
     }
 
     @Test

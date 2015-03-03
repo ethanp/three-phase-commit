@@ -1,7 +1,6 @@
 package system;
 
 import messages.DubCoordinatorMessage;
-import messages.Message;
 import messages.vote_req.AddRequest;
 import messages.vote_req.VoteRequest;
 import node.PeerReference;
@@ -22,7 +21,6 @@ public abstract class TransactionManager {
     protected List<ManagerNodeRef> nodes;
     protected Network network;
     protected ManagerNodeRef coordinator;
-    protected Failure.Case failureCase;
 
     protected int currentTxnID;
 
@@ -32,7 +30,7 @@ public abstract class TransactionManager {
 
     public abstract List<ManagerNodeRef> createNodes(int numNodes);
 
-    ManagerNodeRef remoteNodeWithID(int nodeID) {
+    public ManagerNodeRef remoteNodeWithID(int nodeID) {
         for (ManagerNodeRef n : nodes)
             if (n.getNodeID() == nodeID)
                 return n;
@@ -53,7 +51,7 @@ public abstract class TransactionManager {
     }
 
     private Collection<PeerReference> nodesToPeerRefs() {
-        return nodes.stream().map(n -> new PeerReference(n.nodeID, n.listenPort)).collect(Collectors.toList());
+        return nodes.stream().map(n -> new PeerReference(n.getNodeID(), n.getListenPort())).collect(Collectors.toList());
     }
 
     public List<ManagerNodeRef> getNodes() {

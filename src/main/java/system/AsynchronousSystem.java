@@ -16,7 +16,7 @@ public class AsynchronousSystem extends DistributedSystem {
     @Override Message processRequestToCompletion(VoteRequest voteRequest) {
         try {
             txnMgr.processRequest(voteRequest);
-            voteRequest.wait();
+            Thread.sleep(200000); // TODO fix using a lock or something.
         }
         catch (InterruptedException e) {
             return null;

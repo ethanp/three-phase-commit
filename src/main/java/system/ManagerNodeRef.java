@@ -9,12 +9,12 @@ import system.network.Connection;
  * Ethan Petuchowski 2/16/15
  */
 public class ManagerNodeRef {
-    int nodeID;
-    Connection conn;
-    int listenPort;
+    protected int nodeID;
+    protected Connection conn;
+    protected int listenPort;
 
     public ManagerNodeRef(int nodeID) {
-        this.nodeID = nodeID;
+        this.setNodeID(nodeID);
     }
 
     public void setConn(Connection conn) {
@@ -34,7 +34,7 @@ public class ManagerNodeRef {
     }
 
     public void sendMessage(Message message) {
-        conn.sendMessage(message);
+        getConn().sendMessage(message);
     }
 
     public void killNode() {
@@ -42,10 +42,18 @@ public class ManagerNodeRef {
     }
 
     public Message receiveMessage() {
-        return conn.receiveMessage();
+        return getConn().receiveMessage();
     }
 
     public PeerReference asPeerNode() {
         return new PeerReference(getNodeID(), getListenPort());
+    }
+
+    public Connection getConn() {
+        return conn;
+    }
+
+    public void setNodeID(int nodeID) {
+        this.nodeID = nodeID;
     }
 }

@@ -1,9 +1,11 @@
 package node;
 
+import java.io.Serializable;
+
 /**
  * Ethan Petuchowski 2/27/15
  */
-public class PeerReference implements Comparable<PeerReference>, Cloneable {
+public class PeerReference implements Comparable<PeerReference>, Cloneable, Serializable {
     protected final int nodeID;
     protected int listeningPort;
 
@@ -23,7 +25,7 @@ public class PeerReference implements Comparable<PeerReference>, Cloneable {
     public void setListeningPort(int listeningPort) {
         this.listeningPort = listeningPort;
     }
-    
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

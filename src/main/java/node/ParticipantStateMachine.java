@@ -52,6 +52,8 @@ public class ParticipantStateMachine extends StateMachine {
             return false;
         }
 
+        System.out.println("Node "+node.getMyNodeID()+" received a "+msg.getCommand());
+
         switch (msg.getCommand()) {
 
             /* VOTE REQUESTS */

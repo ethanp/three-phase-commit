@@ -15,6 +15,14 @@ public class NodeMessage extends Message {
     final int nodeID;
     final int listenPort;
 
+    public int getNodeID() {
+        return nodeID;
+    }
+
+    public int getListenPort() {
+        return listenPort;
+    }
+
     @Override protected void writeAsTokens(TokenWriter writer) {
         throw new NotImplementedException();
     }

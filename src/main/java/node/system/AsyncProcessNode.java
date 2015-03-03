@@ -22,6 +22,7 @@ import static util.Common.TXN_MGR_ID;
 public class AsyncProcessNode extends Node {
 
     NodeServer nodeServer;
+    AsyncLogger L;
 
     AsyncProcessNode(int systemListenPort, int myNodeID) {
         super(myNodeID);
@@ -29,18 +30,23 @@ public class AsyncProcessNode extends Node {
 
         /* start local server */
         nodeServer = new NodeServer();
+        L = new AsyncLogger(getMyNodeID(), getListenPort());
+        L.OG("Server starting");
         new Thread(nodeServer).start();
 
         /* connect to System */
         try {
-            txnMgrConn = new ObjectConnection(new Socket(Common.LOCALHOST, systemListenPort), TXN_MGR_ID);
-            System.out.println("Node "+myNodeID+" connected to System");
+            L.OG("establishing socket connection to system at port "+systemListenPort);
+            final Socket socket = new Socket(Common.LOCALHOST, systemListenPort);
+            L.OG("establishing object connection to system at port "+systemListenPort);
+            txnMgrConn = new ObjectConnection(socket, TXN_MGR_ID);
+            L.OG("connected to System");
 
             /* tell the System my logical ID and listen port */
             txnMgrConn.sendMessage(new NodeMessage(getMyNodeID(), getListenPort()));
         }
         catch (IOException e) {
-            System.err.println("Node "+myNodeID+" couldn't establish connection to the System");
+            L.OG("couldn't establish connection to the System");
             System.exit(Common.EXIT_FAILURE);
         }
     }
@@ -114,7 +120,7 @@ public class AsyncProcessNode extends Node {
     public static void main(String[] args) throws IOException {
         int systemListenPort = args.length > 0 ? Integer.parseInt(args[0]) : 3000;
         int nodeID = args.length > 1 ? Integer.parseInt(args[1]) : 55;
-        System.out.println("Node "+nodeID);
+        System.out.println("Node "+nodeID+" booting in its own process");
         AsyncProcessNode node = new AsyncProcessNode(systemListenPort, nodeID);
     }
 }

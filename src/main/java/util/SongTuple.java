@@ -3,10 +3,12 @@ package util;
 import messages.TokenReader;
 import messages.TokenWriter;
 
+import java.io.Serializable;
+
 /**
  * Ethan Petuchowski 2/27/15
  */
-public class SongTuple implements Comparable<SongTuple> {
+public class SongTuple implements Comparable<SongTuple>, Serializable {
     String name;
     String url;
 
@@ -43,12 +45,12 @@ public class SongTuple implements Comparable<SongTuple> {
     public String toLogString() {
         return name+"\n"+url;
     }
-    
+
     public void writeAsTokens(TokenWriter writer) {
     	writer.writeToken(name);
     	writer.writeToken(url);
     }
-    
+
     public static SongTuple readFromTokens(TokenReader reader) {
     	return new SongTuple(reader.readToken(), reader.readToken());
     }
