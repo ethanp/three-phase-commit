@@ -13,7 +13,6 @@ import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.system.SyncNode;
-
 import org.junit.Before;
 import org.junit.Test;
 import system.network.QueueConnection;
@@ -24,11 +23,7 @@ import util.TestCommon;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 
-import javax.jws.Oneway;
-
-import static messages.Message.Command.ABORT;
 import static messages.Message.Command.ACK;
-import static messages.Message.Command.DUB_COORDINATOR;
 import static messages.Message.Command.UR_ELECTED;
 import static messages.Message.Command.YES;
 import static org.hamcrest.CoreMatchers.containsString;

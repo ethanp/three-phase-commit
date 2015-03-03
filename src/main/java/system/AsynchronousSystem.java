@@ -1,5 +1,6 @@
 package system;
 
+import messages.Message;
 import messages.vote_req.VoteRequest;
 
 /**
@@ -12,14 +13,14 @@ public class AsynchronousSystem extends DistributedSystem {
         this.txnMgr = new AsyncTxnMgr(numNodes);
     }
 
-    @Override boolean processRequestToCompletion(VoteRequest voteRequest) {
+    @Override Message processRequestToCompletion(VoteRequest voteRequest) {
         try {
             txnMgr.processRequest(voteRequest);
             voteRequest.wait();
         }
         catch (InterruptedException e) {
-            return false;
+            return null;
         }
-        return true;
+        return null;
     }
 }

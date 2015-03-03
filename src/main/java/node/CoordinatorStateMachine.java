@@ -134,6 +134,7 @@ public class CoordinatorStateMachine extends StateMachine {
         }
         setPeerSet(peerSet);
         txnConnections = conns;
+        ownerNode.getPeerConns().addAll(txnConnections);
 
         state = CoordinatorState.WaitingForVotes;
         ongoingTransactionID = message.getTransactionID();

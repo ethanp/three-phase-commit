@@ -1,5 +1,6 @@
 package system;
 
+import messages.Message;
 import messages.vote_req.VoteRequest;
 
 /**
@@ -15,20 +16,23 @@ public class SynchronousSystem extends DistributedSystem {
         txnMgr = new SyncTxnMgr(numNodes);
     }
 
-    @Override boolean processRequestToCompletion(VoteRequest voteRequest) {
-        boolean result;
+    @Override Message processRequestToCompletion(VoteRequest voteRequest) {
+        Message result;
+        boolean noTick;
         txnMgr.processRequest(voteRequest);
         for (int i = 0; i < MAX_TICKS; i++) {
-            result = true;
-            result &= txnMgr.tick();
+            noTick = true;
+            result = txnMgr.tick();
             for (ManagerNodeRef node : txnMgr.getNodes()) {
-                result &= ((SyncManagerNodeRef) node).tick();
+                noTick &= ((SyncManagerNodeRef) node).tick();
             }
-            if (result)
-                return true;
+            if (noTick && result != null)
+                return result;
         }
         System.err.println("Did not complete in "+MAX_TICKS+" ticks");
-        return false;
+
+        // TODO return new TimeoutRequest();
+        return null;
     }
 
 }

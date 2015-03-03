@@ -30,17 +30,17 @@ public class SyncTxnMgr extends TransactionManager {
 
 
     /**
-     * @return true if received COMMIT, or ABORT
+     * @return return COMMIT, or ABORT if that was received, otw NULL
      */
-    public boolean tick() {
+    public Message tick() {
         for (ManagerNodeRef nodeRef : nodes) {
             Message message = nodeRef.receiveMessage();
             if (message != null) {
                 if (message.getCommand() == COMMIT || message.getCommand() == ABORT) {
-                    return true;
+                    return message;
                 }
             }
         }
-        return false;
+        return null;
     }
 }
