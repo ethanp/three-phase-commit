@@ -8,6 +8,7 @@ import node.PeerReference;
 import node.system.SyncNode;
 import org.junit.Before;
 import org.junit.Test;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import util.TestCommon;
 
 import java.util.List;
@@ -36,8 +37,9 @@ public class AsynchronousSystemTest extends TestCommon {
     }
 
     private void waitForNodesToConnectToTxnMgr() {
-        /* I'm thinking this needs to be an "observer" of whenever the event
+        /* TODO I'm thinking this needs to be an "observer" of whenever the event
            occurs that the AsyncTxnMgr hasAllNodeConnections */
+        throw new NotImplementedException();
     }
 
     @Test

@@ -88,9 +88,9 @@ public abstract class Node {
             break;
         default:
         	break;
-	    }    	
+	    }
     }
-    
+
     private void commitDelete(DeleteRequest deleteRequest) {
         removeSongWithName(deleteRequest.getSongName());
     }
@@ -102,7 +102,7 @@ public abstract class Node {
     private void commitAdd(AddRequest addRequest) {
         addSong(addRequest.getSongTuple());
     }
-    
+
     public boolean addSong(SongTuple songTuple) {
         return playlist.add(songTuple);
     }
@@ -116,7 +116,7 @@ public abstract class Node {
         addSong(updatedSong);
     }
 
-    protected boolean receiveMessageFrom(Connection connection) {
+    protected synchronized boolean receiveMessageFrom(Connection connection) {
         return stateMachine.receiveMessage(connection);
     }
 

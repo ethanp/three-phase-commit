@@ -29,8 +29,8 @@ public class SyncNode extends Node {
 
     /**
      * processes at most one incoming message
-     * @returns false if a message was processed
-     * @returns true if there were no messages to process
+     * @return false if a message was processed,
+     *         true if there were no messages to process
      */
     public boolean tick() {
 

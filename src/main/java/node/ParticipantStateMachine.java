@@ -8,7 +8,6 @@ import messages.Message;
 import messages.NoResponse;
 import messages.PeerTimeout;
 import messages.PrecommitRequest;
-import messages.TokenWriter;
 import messages.YesResponse;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
@@ -22,7 +21,6 @@ import java.util.Collection;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 
-import static messages.Message.Command.UR_ELECTED;
 import static util.Common.NO_ONGOING_TRANSACTION;
 
 /**
@@ -40,7 +38,7 @@ public class ParticipantStateMachine extends StateMachine {
     private boolean precommitted = false;
     private Connection currentConnection = null;
     private int coordinatorId;
-    
+
     public ParticipantStateMachine(Node node) {
         this.node = node;
     }
@@ -111,7 +109,7 @@ public class ParticipantStateMachine extends StateMachine {
 
     private void receiveVoteRequest(VoteRequest voteRequest, boolean voteValue) {
     	setCoordinatorID(currentConnection.getReceiverID());
-    	node.logMessage(voteRequest);        
+    	node.logMessage(voteRequest);
         if (voteValue) {
             respondYESToVoteRequest(voteRequest);
         }
@@ -160,7 +158,7 @@ public class ParticipantStateMachine extends StateMachine {
         setUpSet(voteRequest.getCloneOfPeerSet());
         logAndSendMessage(new YesResponse(voteRequest));
     }
-    
+
     public void logAndSendMessage(Message message) {
         node.logMessage(message);
         currentConnection.sendMessage(message);
@@ -187,7 +185,7 @@ public class ParticipantStateMachine extends StateMachine {
     public void setCoordinatorID(int coordinatorID) {
     	this.coordinatorId = coordinatorID;
     }
-    
+
     public Collection<PeerReference> getUpSet() {
         return upSet;
     }

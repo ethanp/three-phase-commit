@@ -2,6 +2,7 @@ package system;
 
 import messages.Message;
 import node.PeerReference;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.network.Connection;
 
 /**
@@ -37,7 +38,7 @@ public class ManagerNodeRef {
     }
 
     public void killNode() {
-
+        throw new NotImplementedException();
     }
 
     public Message receiveMessage() {

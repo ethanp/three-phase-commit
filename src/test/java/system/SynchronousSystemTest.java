@@ -8,7 +8,6 @@ import node.PeerReference;
 import node.system.SyncNode;
 import org.junit.Before;
 import org.junit.Test;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import util.TestCommon;
 
 import java.util.List;
@@ -72,52 +71,102 @@ public class SynchronousSystemTest extends TestCommon {
 
     @Test
     public void testReceiveAbortWhenUpdatingNonexistentSong() throws Exception {
-        throw new NotImplementedException();
+        VoteRequest update = new UpdateRequest(A_SONG_NAME, A_SONG_TUPLE, TXID, peerReferences);
+        assertEquals(ABORT, system.processRequestToCompletion(update).getCommand());
+
+        assertFalse(coordinator.hasExactSongTuple(A_SONG_TUPLE));
+        assertFalse(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
     public void testReceiveAbortWhenAddingExistingSong() throws Exception {
+
         VoteRequest addRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
         assertEquals(COMMIT, system.processRequestToCompletion(addRequest).getCommand());
-        VoteRequest repeatReq = new AddRequest(A_SONG_TUPLE, TXID+1, peerReferences);
 
+        VoteRequest repeatReq = new AddRequest(A_SONG_TUPLE, TXID+1, peerReferences);
         assertEquals(ABORT, system.processRequestToCompletion(repeatReq).getCommand());
+
+        assertTrue(coordinator.hasExactSongTuple(A_SONG_TUPLE));
         assertTrue(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
     public void testReceiveAbortWhenDeletingNonexistentSong() throws Exception {
-        VoteRequest deleteRequest = new DeleteRequest(A_SONG_NAME, TXID, peerReferences);
-        assertEquals(ABORT, system.processRequestToCompletion(deleteRequest).getCommand());
+        VoteRequest voteRequest = new DeleteRequest(A_SONG_NAME, TXID, peerReferences);
+        assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
+
+        assertFalse(coordinator.hasExactSongTuple(A_SONG_TUPLE));
+        assertFalse(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
     public void testReceiveAbortWhenAddingPartiallyReplicatedSong_onlyOnAParticipant() throws Exception {
+
         participant.addSong(A_SONG_TUPLE);
+
+        VoteRequest voteRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
+        assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
+
+        assertFalse(coordinator.hasExactSongTuple(A_SONG_TUPLE));
+        assertTrue(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
     public void testReceiveAbortWhenAddingPartiallyReplicatedSong_onlyOnCoordinator() throws Exception {
-        throw new NotImplementedException();
+
+        coordinator.addSong(A_SONG_TUPLE);
+
+        VoteRequest voteRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
+        assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
+
+        assertTrue(coordinator.hasExactSongTuple(A_SONG_TUPLE));
+        assertFalse(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
     public void testReceiveAbortWhenUpdatingPartiallyReplicatedSong_onlyOnAParticipant() throws Exception {
-        throw new NotImplementedException();
+
+        participant.addSong(A_SONG_TUPLE);
+
+        VoteRequest voteRequest = new UpdateRequest(A_SONG_NAME, SAME_SONG_NEW_URL, TXID, peerReferences);
+        assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
+
+        assertFalse(coordinator.hasExactSongTuple(A_SONG_TUPLE));
+        assertFalse(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
     public void testReceiveAbortWhenUpdatingPartiallyReplicatedSong_onlyOnCoordinator() throws Exception {
-        throw new NotImplementedException();
+
+        coordinator.addSong(A_SONG_TUPLE);
+
+        VoteRequest voteRequest = new UpdateRequest(A_SONG_NAME, SAME_SONG_NEW_URL, TXID, peerReferences);
+        assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
+
+        assertTrue(coordinator.hasExactSongTuple(A_SONG_TUPLE));
+        assertFalse(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
     public void testReceiveAbortWhenDeletingPartiallyReplicatedSong_onlyAParticipantIsMissingIt() throws Exception {
-        throw new NotImplementedException();
+
+        coordinator.addSong(A_SONG_TUPLE);
+
+        VoteRequest voteRequest = new DeleteRequest(A_SONG_NAME, TXID, peerReferences);
+        assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
+
+        assertTrue(coordinator.hasExactSongTuple(A_SONG_TUPLE));
+        assertFalse(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
     public void testReceiveAbortWhenDeletingPartiallyReplicatedSong_onlyCoordinatorIsMissingIt() throws Exception {
-        throw new NotImplementedException();
+
+        VoteRequest voteRequest = new DeleteRequest(A_SONG_NAME, TXID, peerReferences);
+        assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
+
+        assertFalse(coordinator.hasExactSongTuple(A_SONG_TUPLE));
+        assertTrue(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 }

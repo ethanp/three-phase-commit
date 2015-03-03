@@ -258,12 +258,17 @@ public class CoordinatorStateMachineTest extends TestCommon {
     }
 
     @Test
-    public void testReceiveNoFromNodeAfterHavingAbortedTransaction() throws Exception {
+    public void testReceiveNOFromNodeAfterHavingAbortedTransaction() throws Exception {
         throw new NotImplementedException();
     }
 
     @Test
-    public void testReceiveNoFromMultipleNodesWhenTheyAllSayNo() throws Exception {
+    public void testReceiveYESFromNodeAfterHavingAbortedTransaction() throws Exception {
+        throw new NotImplementedException();
+    }
+
+    @Test
+    public void testAbortAddRequestOnNonexistentSongAfterReceivingNOFromParticipant() throws Exception {
         throw new NotImplementedException();
     }
 }

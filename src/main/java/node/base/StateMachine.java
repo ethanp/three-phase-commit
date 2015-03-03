@@ -1,9 +1,9 @@
 package node.base;
 
-import java.util.Collection;
-
 import node.PeerReference;
 import system.network.Connection;
+
+import java.util.Collection;
 
 /**
  * Ethan Petuchowski 2/26/15
@@ -18,6 +18,6 @@ public abstract class StateMachine {
     public void setPeerSet(Collection<PeerReference> peerSet) {
         this.peerSet = peerSet;
     }
-    
+
     public abstract boolean receiveMessage(Connection overConnection);
 }

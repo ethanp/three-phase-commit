@@ -43,4 +43,14 @@ public class ObjectConnection extends Connection {
             e.printStackTrace();
         }
     }
+
+    public boolean messageWaiting() {
+        try {
+            return in.available() > 0;
+        }
+        catch (IOException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 }

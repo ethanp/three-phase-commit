@@ -1,8 +1,9 @@
 package system.network;
 
-import system.TransactionManager;
 import messages.Message;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.ManagerNodeRef;
+import system.TransactionManager;
 
 import java.util.Collection;
 
@@ -29,7 +30,7 @@ public class Network {
     }
 
     public void send(Message message, ManagerNodeRef to) {
-
+        throw new NotImplementedException();
     }
 
     public void setNetworkDelay(NetworkDelay.Type networkDelay) {
@@ -41,6 +42,6 @@ public class Network {
     }
 
     public void applyConnectivity() {
-
+        throw new NotImplementedException();
     }
 }

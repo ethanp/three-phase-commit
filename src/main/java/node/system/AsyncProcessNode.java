@@ -1,5 +1,6 @@
 package node.system;
 
+import messages.NodeMessage;
 import node.PeerReference;
 import node.base.Node;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
@@ -35,13 +36,40 @@ public class AsyncProcessNode extends Node {
             txnMgrConn = new ObjectConnection(new Socket(Common.LOCALHOST, systemListenPort), TXN_MGR_ID);
             System.out.println("Node "+myNodeID+" connected to System");
 
-            /* tell the System my ID then my listen port */
-//            connection.sendMessage(new Integer(myNodeID));
-//            connection.out.writeInt(nodeServer.getListenPort());
+            /* tell the System my logical ID and listen port */
+            txnMgrConn.sendMessage(new NodeMessage(getMyNodeID(), getListenPort()));
         }
         catch (IOException e) {
             System.err.println("Node "+myNodeID+" couldn't establish connection to the System");
             System.exit(Common.EXIT_FAILURE);
+        }
+    }
+
+    int getListenPort() {
+        return nodeServer.getListenPort();
+    }
+
+    @Override public void addConnection(Connection connection) {
+        super.addConnection(connection);
+        new Thread(new ConnectionListener((ObjectConnection)connection)).start();
+    }
+
+    class ConnectionListener implements Runnable {
+        ObjectConnection connection;
+        ConnectionListener(ObjectConnection connection) {
+            this.connection = connection;
+        }
+
+        @Override public void run() {
+            while (true) {
+                while (!connection.messageWaiting()) try {
+                    Thread.sleep(Common.MESSAGE_DELAY);
+                }
+                catch (InterruptedException e) {
+                    e.printStackTrace();
+                }
+                receiveMessageFrom(connection);
+            }
         }
     }
 
@@ -74,6 +102,7 @@ public class AsyncProcessNode extends Node {
             while (true) {
                 try {
                     Socket socket = serverSocket.accept();
+                    addConnection(new ObjectConnection(socket, Common.INVALID_ID));
                 }
                 catch (IOException e) {
                     e.printStackTrace();
@@ -83,8 +112,8 @@ public class AsyncProcessNode extends Node {
     }
 
     public static void main(String[] args) throws IOException {
-        int systemListenPort = Integer.parseInt(args[0]);
-        int nodeID = Integer.parseInt(args[1]);
+        int systemListenPort = args.length > 0 ? Integer.parseInt(args[0]) : 3000;
+        int nodeID = args.length > 1 ? Integer.parseInt(args[1]) : 55;
         System.out.println("Node "+nodeID);
         AsyncProcessNode node = new AsyncProcessNode(systemListenPort, nodeID);
     }

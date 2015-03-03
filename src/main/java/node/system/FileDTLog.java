@@ -16,6 +16,13 @@ public class FileDTLog extends DTLog {
         super(node);
         this.file = file;
         try {
+            if (!file.getParentFile().exists())
+                file.getParentFile().mkdirs();
+
+            if (file.exists())
+                file.delete();
+
+            file.createNewFile();
             writer = new FileWriter(file);
         }
         catch (IOException e) {

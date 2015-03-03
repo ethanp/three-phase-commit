@@ -1,10 +1,10 @@
 package messages;
 
-import java.io.Serializable;
-
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
+
+import java.io.Serializable;
 
 /**
  * Ethan Petuchowski 2/17/15
@@ -32,7 +32,8 @@ public abstract class Message implements Serializable {
         UPDATE,
         DELETE,
         UR_ELECTED,
-        TIMEOUT
+        TIMEOUT,
+        NODE
     }
     Command command;
 
@@ -41,15 +42,15 @@ public abstract class Message implements Serializable {
     }
 
     protected int transactionID;
-    
+
     protected abstract void writeAsTokens(TokenWriter writer);
     protected abstract void readFromTokens(TokenReader reader);
-    
+
     public static void writeMessage(Message m, TokenWriter writer) {
     	writer.writeToken(m.command.toString());
     	m.writeAsTokens(writer);
     }
-    
+
     public static Message readMessage(TokenReader reader) {
     	String commandString = reader.readToken();
     	if (commandString == null) {
@@ -95,7 +96,7 @@ public abstract class Message implements Serializable {
 			m = new PeerTimeout(-1);
 			break;
 		default:
-			throw new RuntimeException("Cannot read message from tokens");    	
+			throw new RuntimeException("Cannot read message from tokens");
     	}
     	m.readFromTokens(reader);
     	return m;
