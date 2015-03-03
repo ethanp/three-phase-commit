@@ -7,7 +7,7 @@ import messages.vote_req.VoteRequest;
  *
  * ticks all members of the system
  */
-public class SynchronousSystem {
+public class SynchronousSystem extends DistributedSystem {
     final SyncTxnMgr txnMgr;
     public static final int MAX_TICKS = 200;
 
@@ -15,7 +15,7 @@ public class SynchronousSystem {
         txnMgr = new SyncTxnMgr(numNodes);
     }
 
-    boolean handleRequest(VoteRequest voteRequest) {
+    @Override boolean processRequestToCompletion(VoteRequest voteRequest) {
         boolean result;
         txnMgr.processRequest(voteRequest);
         for (int i = 0; i < MAX_TICKS; i++) {

@@ -193,12 +193,44 @@ public class CoordinatorStateMachineTest extends TestCommon {
     }
 
     @Test
-    public void testSendCommitToTxnMgrToo() throws Exception {
+    public void testSendsCommitToTxnMgrToo() throws Exception {
         throw new NotImplementedException();
     }
 
     @Test
-    public void testSendAbortToTxnMgrToo() throws Exception {
+    public void testSendsAbortToTxnMgrToo() throws Exception {
+        throw new NotImplementedException();
+    }
+
+    @Test
+    public void testUpdateStateOnCommit_addSong() throws Exception {
+        receiveCommandFromTransactionManager();
+        // TODO the following
+        assertTrue(syncNode.hasExactSongTuple(A_SONG_TUPLE));
+    }
+
+    @Test
+    public void testUpdateStateOnCommit_updateSong() throws Exception {
+        throw new NotImplementedException();
+    }
+
+    @Test
+    public void testUpdateStateOnCommit_deleteSong() throws Exception {
+        throw new NotImplementedException();
+    }
+
+    @Test
+    public void testAbortRequestToAddExistingSong() throws Exception {
+        throw new NotImplementedException();
+    }
+
+    @Test
+    public void testAbortRequestToDeleteNonExistingSong() throws Exception {
+        throw new NotImplementedException();
+    }
+
+    @Test
+    public void testAbortRequestToUpdateNonExistingSong() throws Exception {
         throw new NotImplementedException();
     }
 }
