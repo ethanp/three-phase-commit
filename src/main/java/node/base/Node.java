@@ -2,6 +2,10 @@ package node.base;
 
 import messages.Message;
 import messages.TokenWriter;
+import messages.vote_req.AddRequest;
+import messages.vote_req.DeleteRequest;
+import messages.vote_req.UpdateRequest;
+import messages.vote_req.VoteRequest;
 import node.CoordinatorStateMachine;
 import node.ParticipantStateMachine;
 import node.PeerReference;
@@ -71,6 +75,34 @@ public abstract class Node {
         return playlist.contains(new SongTuple(name, "doesn't matter"));
     }
 
+    public void commitAction(VoteRequest action) {
+        switch (action.getCommand()) {
+        case ADD:
+            commitAdd((AddRequest) action);
+            break;
+        case UPDATE:
+            commitUpdate((UpdateRequest) action);
+            break;
+        case DELETE:
+            commitDelete((DeleteRequest) action);
+            break;
+        default:
+        	break;
+	    }    	
+    }
+    
+    private void commitDelete(DeleteRequest deleteRequest) {
+        removeSongWithName(deleteRequest.getSongName());
+    }
+
+    private void commitUpdate(UpdateRequest updateRequest) {
+        updateSong(updateRequest.getSongName(), updateRequest.getUpdatedSong());
+    }
+
+    private void commitAdd(AddRequest addRequest) {
+        addSong(addRequest.getSongTuple());
+    }
+    
     public boolean addSong(SongTuple songTuple) {
         return playlist.add(songTuple);
     }

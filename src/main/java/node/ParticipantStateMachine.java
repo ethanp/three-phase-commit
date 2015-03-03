@@ -143,30 +143,8 @@ public class ParticipantStateMachine extends StateMachine {
 
     private void receiveCommit(CommitRequest commitRequest) {
         node.logMessage(commitRequest);
-        switch (action.getCommand()) {
-            case ADD:
-                commitAdd((AddRequest) action);
-                break;
-            case UPDATE:
-                commitUpdate((UpdateRequest) action);
-                break;
-            case DELETE:
-                commitDelete((DeleteRequest) action);
-                break;
-        }
+        node.commitAction(action);
         setOngoingTransactionID(NO_ONGOING_TRANSACTION);
-    }
-
-    private void commitDelete(DeleteRequest deleteRequest) {
-        node.removeSongWithName(deleteRequest.getSongName());
-    }
-
-    private void commitUpdate(UpdateRequest updateRequest) {
-        node.updateSong(updateRequest.getSongName(), updateRequest.getUpdatedSong());
-    }
-
-    private void commitAdd(AddRequest addRequest) {
-        node.addSong(addRequest.getSongTuple());
     }
 
     public void respondNOToVoteRequest(Message message) {
