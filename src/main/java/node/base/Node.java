@@ -99,10 +99,29 @@ public abstract class Node {
     public Collection<Connection> getPeerConns() {
         return peerConns;
     }
-    
+
     public Connection getPeerConnForId(int id) {
     	return peerConns.stream().filter(c -> c.getReceiverID() == id).findFirst().get();
     }
 
+    public void sendTxnMgrMsg(Message message) {
+        txnMgrConn.sendMessage(message);
+    }
+
+    /**
+     * calling this method should make this peer acquire a connection to the referenced peer
+     * AND should ('eventually') make that peer acquire a reciprocal connection back to this peer
+     *
+     * In the synchronous case, this means directly adding each end of the QueueSocket to each
+     * peer's `peerConns` collection
+     *
+     * In the asynchronous case, it means establishing a socket with the referenced peer's server
+     */
     public abstract Connection connectTo(PeerReference peerReference);
+
+    public boolean isConnectedTo(PeerReference reference) {
+        return peerConns.stream()
+                        .filter(conn -> conn.getReceiverID() == reference.getNodeID())
+                        .count() > 0;
+    }
 }

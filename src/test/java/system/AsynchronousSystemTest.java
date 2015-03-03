@@ -8,7 +8,6 @@ import node.PeerReference;
 import node.system.SyncNode;
 import org.junit.Before;
 import org.junit.Test;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import util.TestCommon;
 
 import java.util.List;
@@ -17,25 +16,19 @@ import java.util.stream.Collectors;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-public class SynchronousSystemTest extends TestCommon {
-
-    SyncNode coordinator;
-    SyncNode participant;
-    SynchronousSystem system;
+public class AsynchronousSystemTest extends TestCommon {
+    AsynchronousSystem system;
     List<PeerReference> peerReferences;
 
     @Before
     public void setUp() throws Exception {
-        system = new SynchronousSystem(5);
+        system = new AsynchronousSystem(5);
 
         List<ManagerNodeRef> nodes = system.txnMgr.getNodes();
 
         peerReferences = nodes.stream()
                               .map(mgrNode -> mgrNode.asPeerNode())
                               .collect(Collectors.toList());
-
-        coordinator = ((SyncManagerNodeRef) nodes.get(0)).getNode();
-        participant = ((SyncManagerNodeRef) nodes.get(1)).getNode();
     }
 
     @Test
@@ -62,50 +55,5 @@ public class SynchronousSystemTest extends TestCommon {
         assertTrue(system.processRequestToCompletion(addRequest));
         VoteRequest deleteRequest = new DeleteRequest(A_SONG_NAME, TXID+1, peerReferences);
         assertTrue(system.processRequestToCompletion(deleteRequest));
-    }
-
-    @Test
-    public void testReceiveAbortWhenUpdatingNonexistentSong() throws Exception {
-        throw new NotImplementedException();
-    }
-
-    @Test
-    public void testReceiveAbortWhenAddingExistingSong() throws Exception {
-        throw new NotImplementedException();
-    }
-
-    @Test
-    public void testReceiveAbortWhenDeletingNonexistentSong() throws Exception {
-        throw new NotImplementedException();
-    }
-
-    @Test
-    public void testReceiveAbortWhenAddingPartiallyReplicatedSong_onlyOnAParticipant() throws Exception {
-        throw new NotImplementedException();
-    }
-
-    @Test
-    public void testReceiveAbortWhenAddingPartiallyReplicatedSong_onlyOnCoordinator() throws Exception {
-        throw new NotImplementedException();
-    }
-
-    @Test
-    public void testReceiveAbortWhenUpdatingPartiallyReplicatedSong_onlyOnAParticipant() throws Exception {
-        throw new NotImplementedException();
-    }
-
-    @Test
-    public void testReceiveAbortWhenUpdatingPartiallyReplicatedSong_onlyOnCoordinator() throws Exception {
-        throw new NotImplementedException();
-    }
-
-    @Test
-    public void testReceiveAbortWhenDeletingPartiallyReplicatedSong_onlyAParticipantIsMissingIt() throws Exception {
-        throw new NotImplementedException();
-    }
-
-    @Test
-    public void testReceiveAbortWhenDeletingPartiallyReplicatedSong_onlyCoordinatorIsMissingIt() throws Exception {
-        throw new NotImplementedException();
     }
 }
