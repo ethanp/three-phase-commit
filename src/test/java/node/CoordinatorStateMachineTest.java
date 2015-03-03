@@ -256,4 +256,14 @@ public class CoordinatorStateMachineTest extends TestCommon {
     public void testAbortRequestToUpdateNonExistingSong() throws Exception {
         throw new NotImplementedException();
     }
+
+    @Test
+    public void testReceiveNoFromNodeAfterHavingAbortedTransaction() throws Exception {
+        throw new NotImplementedException();
+    }
+
+    @Test
+    public void testReceiveNoFromMultipleNodesWhenTheyAllSayNo() throws Exception {
+        throw new NotImplementedException();
+    }
 }

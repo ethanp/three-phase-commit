@@ -14,6 +14,7 @@ import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.system.SyncNode;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import system.network.QueueConnection;
 import system.network.QueueSocket;
@@ -346,8 +347,8 @@ public class ParticipantStateMachineTest extends TestCommon {
      * to properly know how to emulate the triggering of the heartbeat and what really
      * should happen. This is a guess though.
      */
-    @Test
-    public void testCoordinatorTimeoutOnHeartbeat() throws Exception {
+    @Ignore // TODO change @Ignore to @Test after doing the async stuff
+    private void testCoordinatorTimeoutOnHeartbeat() throws Exception {
 
         PriorityQueue<PeerReference> queue = new PriorityQueue<>(A_PEER_REFS);
         int coordinatorID = queue.poll().getNodeID();
@@ -359,9 +360,9 @@ public class ParticipantStateMachineTest extends TestCommon {
         int peerRefsInitialSize = A_PEER_REFS.size();
 
         participantSM.setUpSet(participantSM.getPeerSet()
-                        .stream()
-                        .map(PeerReference::clone)
-                        .collect(Collectors.toList()));
+                                            .stream()
+                                            .map(PeerReference::clone)
+                                            .collect(Collectors.toList()));
 
         participantSM.setOngoingTransactionID(TXID);
 

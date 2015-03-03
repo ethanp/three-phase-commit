@@ -1,6 +1,7 @@
 package system;
 
 import messages.Message;
+import messages.PeerTimeout;
 import messages.vote_req.VoteRequest;
 
 /**
@@ -30,9 +31,6 @@ public class SynchronousSystem extends DistributedSystem {
                 return result;
         }
         System.err.println("Did not complete in "+MAX_TICKS+" ticks");
-
-        // TODO return new TimeoutRequest();
-        return null;
+        return new PeerTimeout(-1);
     }
-
 }

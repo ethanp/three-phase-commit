@@ -80,19 +80,20 @@ public class SynchronousSystemTest extends TestCommon {
         VoteRequest addRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
         assertEquals(COMMIT, system.processRequestToCompletion(addRequest).getCommand());
         VoteRequest repeatReq = new AddRequest(A_SONG_TUPLE, TXID+1, peerReferences);
-        assertEquals(ABORT, system.processRequestToCompletion(repeatReq).getCommand());
 
+        assertEquals(ABORT, system.processRequestToCompletion(repeatReq).getCommand());
         assertTrue(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
     public void testReceiveAbortWhenDeletingNonexistentSong() throws Exception {
-        throw new NotImplementedException();
+        VoteRequest deleteRequest = new DeleteRequest(A_SONG_NAME, TXID, peerReferences);
+        assertEquals(ABORT, system.processRequestToCompletion(deleteRequest).getCommand());
     }
 
     @Test
     public void testReceiveAbortWhenAddingPartiallyReplicatedSong_onlyOnAParticipant() throws Exception {
-        throw new NotImplementedException();
+        participant.addSong(A_SONG_TUPLE);
     }
 
     @Test
