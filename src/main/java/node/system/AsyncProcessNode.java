@@ -45,6 +45,15 @@ public class AsyncProcessNode extends Node {
         }
     }
 
+    /**
+     * calling this method should make this peer acquire a connection to the referenced peer AND
+     * should ('eventually') make that peer acquire a reciprocal connection back to this peer
+     * <p>
+     * In the synchronous case, this means directly adding each end of the QueueSocket to each
+     * peer's `peerConns` collection
+     * <p>
+     * In the asynchronous case, it means establishing a socket with the referenced peer's server
+     */
     @Override public Connection connectTo(PeerReference peerReference) {
         throw new NotImplementedException();
     }

@@ -1,6 +1,7 @@
 package system;
 
 import messages.Message;
+import node.PeerReference;
 import system.network.Connection;
 
 /**
@@ -23,7 +24,11 @@ public class ManagerNodeRef {
         this.listenPort = listenPort;
     }
 
-    public int getID() {
+    public int getListenPort() {
+        return listenPort;
+    }
+
+    public int getNodeID() {
         return nodeID;
     }
 
@@ -37,5 +42,9 @@ public class ManagerNodeRef {
 
     public Message receiveMessage() {
         return conn.receiveMessage();
+    }
+
+    public PeerReference asPeerNode() {
+        return new PeerReference(getNodeID(), getListenPort());
     }
 }

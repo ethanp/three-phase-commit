@@ -33,7 +33,7 @@ public abstract class TransactionManager {
 
     ManagerNodeRef remoteNodeWithID(int nodeID) {
         for (ManagerNodeRef n : nodes)
-            if (n.getID() == nodeID)
+            if (n.getNodeID() == nodeID)
                 return n;
         return null;
     }

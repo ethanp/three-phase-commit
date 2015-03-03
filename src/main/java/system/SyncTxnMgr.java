@@ -23,12 +23,15 @@ public class SyncTxnMgr extends TransactionManager {
         List<ManagerNodeRef> list = new ArrayList<>();
         for (int i = 1; i <= numNodes ; i++) {
             QueueSocket socket = new QueueSocket(Common.TXN_MGR_ID, i);
-            list.add(new SyncManagerNodeRef(i, socket));
+            list.add(new SyncManagerNodeRef(i, socket, this));
         }
         return list;
     }
 
 
+    /**
+     * @return true if received COMMIT, or ABORT
+     */
     public boolean tick() {
         for (ManagerNodeRef nodeRef : nodes) {
             Message message = nodeRef.receiveMessage();

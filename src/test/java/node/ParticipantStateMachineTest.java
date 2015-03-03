@@ -10,13 +10,11 @@ import messages.vote_req.VoteRequest;
 import node.system.SyncNode;
 import org.junit.Before;
 import org.junit.Test;
-import system.network.Connection;
 import system.network.QueueConnection;
 import system.network.QueueSocket;
 import util.SongTuple;
 import util.TestCommon;
 
-import java.util.Iterator;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 
@@ -28,7 +26,6 @@ import static messages.Message.Command.YES;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -36,29 +33,29 @@ import static util.Common.NO_ONGOING_TRANSACTION;
 
 public class ParticipantStateMachineTest extends TestCommon {
 
-    SyncNode syncNode;
-    ParticipantStateMachine psm;
+    SyncNode participantUnderTest;
+    ParticipantStateMachine participantSM;
     QueueSocket queueSocket;
     QueueConnection peerToCoordinator;
     QueueConnection coordinatorToPeer;
 
     @Before
     public void setUp() throws Exception {
-        syncNode = new SyncNode(TEST_PEER_ID, null);
-        psm = (ParticipantStateMachine) syncNode.getStateMachine();
+        participantUnderTest = new SyncNode(TEST_PEER_ID, null);
+        participantSM = (ParticipantStateMachine) participantUnderTest.getStateMachine();
         queueSocket = new QueueSocket(TEST_COORD_ID, TEST_PEER_ID);
         peerToCoordinator = queueSocket.getConnectionToAID();
-        syncNode.addConnection(peerToCoordinator);
+        participantUnderTest.addConnection(peerToCoordinator);
         coordinatorToPeer = queueSocket.getConnectionToBID();
     }
 
     private void testReceiveFromCoordinator(Message message) {
         coordinatorToPeer.sendMessage(message);
-        assertTrue(psm.receiveMessage(peerToCoordinator));
+        assertTrue(participantSM.receiveMessage(peerToCoordinator));
     }
 
     private void assertStateAfterNOSentToCoordinator() {
-        assertThat(syncNode.getDtLog().getLogAsString(), containsString("ABORT"));
+        assertThat(participantUnderTest.getDtLog().getLogAsString(), containsString("ABORT"));
         /* NO was sent to coordinator */
         assertEquals(1, peerToCoordinator.getOutQueue().size());
         Message response = coordinatorToPeer.receiveMessage();
@@ -66,13 +63,13 @@ public class ParticipantStateMachineTest extends TestCommon {
         assertEquals(TXID, response.getTransactionID());
 
         /* state should be reset to have no known ongoing transaction or working peer set */
-        assertEquals(NO_ONGOING_TRANSACTION, psm.getOngoingTransactionID());
-        assertNull(psm.getPeerSet());
-        assertNull(psm.getUpSet());
+        assertEquals(NO_ONGOING_TRANSACTION, participantSM.getOngoingTransactionID());
+        assertNull(participantSM.getPeerSet());
+        assertNull(participantSM.getUpSet());
     }
 
     private void assertStateAfterYESSentToCoordinator() {
-        assertThat(syncNode.getDtLog().getLogAsString(), containsString("YES"));
+        assertThat(participantUnderTest.getDtLog().getLogAsString(), containsString("YES"));
         /* YES was sent to coordinator */
         assertEquals(1, peerToCoordinator.getOutQueue().size());
         Message response = coordinatorToPeer.receiveMessage();
@@ -80,9 +77,9 @@ public class ParticipantStateMachineTest extends TestCommon {
         assertEquals(TXID, response.getTransactionID());
 
         /* state should be reset to have no known ongoing transaction or working peer set */
-        assertEquals(TXID, psm.getOngoingTransactionID());
-        assertEquals(A_PEER_REFS, psm.getPeerSet());
-        assertEquals(A_PEER_REFS, psm.getUpSet());
+        assertEquals(TXID, participantSM.getOngoingTransactionID());
+        assertEquals(A_PEER_REFS, participantSM.getPeerSet());
+        assertEquals(A_PEER_REFS, participantSM.getUpSet());
     }
 
     @Test
@@ -102,7 +99,7 @@ public class ParticipantStateMachineTest extends TestCommon {
         * */
 
         /* assert log format is correct */
-        final String[] logLines = syncNode.getDtLog().getLogAsString().split("\n");
+        final String[] logLines = participantUnderTest.getDtLog().getLogAsString().split("\n");
         assertThat(logLines[0], containsString("ADD "+TXID));
         assertThat(logLines[1], containsString(A_SONG_NAME));
         assertThat(logLines[2], containsString(A_URL));
@@ -114,8 +111,8 @@ public class ParticipantStateMachineTest extends TestCommon {
         assertTrue(YES.equals(coordinatorToPeer.receiveMessage().getCommand()));
 
         /* this transaction has been set as ONGOING */
-        assertEquals(msg.getTransactionID(), psm.getOngoingTransactionID());
-        assertEquals(msg.getPeerSet(), psm.getPeerSet());
+        assertEquals(msg.getTransactionID(), participantSM.getOngoingTransactionID());
+        assertEquals(msg.getPeerSet(), participantSM.getPeerSet());
     }
 
 
@@ -123,14 +120,14 @@ public class ParticipantStateMachineTest extends TestCommon {
     public void testReceiveInvalidAddRequest_existingSong() throws Exception {
 
         /* node already has the song */
-        syncNode.addSong(A_SONG_TUPLE);
+        participantUnderTest.addSong(A_SONG_TUPLE);
 
         /* then receives a request to add it */
         final AddRequest msg = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
         testReceiveFromCoordinator(msg);
 
         /* assert log format is correct */
-        final String[] logLines = syncNode.getDtLog().getLogAsString().split("\n");
+        final String[] logLines = participantUnderTest.getDtLog().getLogAsString().split("\n");
         assertThat(logLines[0], containsString("ADD "+TXID));
         assertThat(logLines[1], containsString(A_SONG_NAME));
         assertThat(logLines[2], containsString(A_URL));
@@ -144,7 +141,7 @@ public class ParticipantStateMachineTest extends TestCommon {
     public void testReceiveInvalidAddRequest_sameName_differentURL() throws Exception {
 
         /* node already has the song */
-        syncNode.addSong(A_SONG_TUPLE);
+        participantUnderTest.addSong(A_SONG_TUPLE);
 
         /* then receives a request to add the same song with a new URL */
         final AddRequest msg = new AddRequest(SAME_SONG_NEW_URL, TXID, A_PEER_REFS);
@@ -155,7 +152,7 @@ public class ParticipantStateMachineTest extends TestCommon {
 
     @Test
     public void testReceiveInvalidUpdateRequest_nonexistentSong() throws Exception {
-        /* this will be invalid because the psm under test doesn't have a song by this name */
+        /* this will be invalid because the participantSM under test doesn't have a song by this name */
         Message msg = new UpdateRequest(A_SONG_NAME, new SongTuple("newName", A_URL), TXID, A_PEER_REFS);
 
         /* we have to receive the msg so that we can
@@ -168,7 +165,7 @@ public class ParticipantStateMachineTest extends TestCommon {
     @Test
     public void testReceiveValidUpdateRequest() throws Exception {
         /* node already has the song */
-        syncNode.addSong(A_SONG_TUPLE);
+        participantUnderTest.addSong(A_SONG_TUPLE);
 
         /* same name new URL */
         Message msg = new UpdateRequest(A_SONG_NAME, SAME_SONG_NEW_URL, TXID, A_PEER_REFS);
@@ -186,7 +183,7 @@ public class ParticipantStateMachineTest extends TestCommon {
          */
 
         /* assert log state */
-        final String[] logLines = syncNode.getDtLog().getLogAsString().split("\n");
+        final String[] logLines = participantUnderTest.getDtLog().getLogAsString().split("\n");
         assertThat(logLines[0], containsString("UPDATE "+TXID));
         assertThat(logLines[1], containsString(A_SONG_NAME));
         assertThat(logLines[2], containsString(A_SONG_NAME));
@@ -201,7 +198,7 @@ public class ParticipantStateMachineTest extends TestCommon {
     @Test
     public void testReceiveValidDeleteRequest() throws Exception {
         /* node already has the song */
-        syncNode.addSong(A_SONG_TUPLE);
+        participantUnderTest.addSong(A_SONG_TUPLE);
 
         Message msg = new DeleteRequest(A_SONG_NAME, TXID, A_PEER_REFS);
         testReceiveFromCoordinator(msg);
@@ -216,7 +213,7 @@ public class ParticipantStateMachineTest extends TestCommon {
          */
 
         /* assert log state */
-        final String[] logLines = syncNode.getDtLog().getLogAsString().split("\n");
+        final String[] logLines = participantUnderTest.getDtLog().getLogAsString().split("\n");
         assertThat(logLines[0], containsString("DELETE "+TXID));
         assertThat(logLines[1], containsString(A_SONG_NAME));
         assertThat(logLines[2], containsString("PEERS 3 2 2 3 3 4 4"));
@@ -230,115 +227,115 @@ public class ParticipantStateMachineTest extends TestCommon {
     public void testReceiveValidPrecommit() throws Exception {
 
         /* set up and verify the before-state */
-        psm.setOngoingTransactionID(TXID);
-        assertFalse(psm.isPrecommitted());
-        assertEquals(TXID, psm.getOngoingTransactionID());
+        participantSM.setOngoingTransactionID(TXID);
+        assertFalse(participantSM.isPrecommitted());
+        assertEquals(TXID, participantSM.getOngoingTransactionID());
 
         final Message msg = new PrecommitRequest(TXID);
         testReceiveFromCoordinator(msg);
 
-        assertTrue(psm.isPrecommitted());
-        assertEquals(TXID, psm.getOngoingTransactionID());
+        assertTrue(participantSM.isPrecommitted());
+        assertEquals(TXID, participantSM.getOngoingTransactionID());
 
         /* channel state should have an ACK in it */
         assertEquals(1, coordinatorToPeer.getInQueue().size());
         assertEquals(ACK, coordinatorToPeer.receiveMessage().getCommand());
 
         /* log should be "empty" (from the perspective of this one action) */
-        assertEquals("", syncNode.getDtLog().getLogAsString());
+        assertEquals("", participantUnderTest.getDtLog().getLogAsString());
     }
 
     @Test
     public void testReceiveValidCommit_addRequest() throws Exception {
 
         /* proper precommit state for add request */
-        psm.setOngoingTransactionID(TXID);
-        psm.setPrecommitted(true);
+        participantSM.setOngoingTransactionID(TXID);
+        participantSM.setPrecommitted(true);
         final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
-        psm.setAction(action);
+        participantSM.setAction(action);
 
         /* receive commit request */
         final Message msg = new CommitRequest(TXID);
         testReceiveFromCoordinator(msg);
 
         /* assert correct resulting state */
-        assertThat(syncNode.getDtLog().getLogAsString(), containsString("COMMIT"));
-        assertEquals(NO_ONGOING_TRANSACTION, psm.getOngoingTransactionID());
+        assertThat(participantUnderTest.getDtLog().getLogAsString(), containsString("COMMIT"));
+        assertEquals(NO_ONGOING_TRANSACTION, participantSM.getOngoingTransactionID());
         assertTrue(peerToCoordinator.getOutQueue().isEmpty());
 
         /* including action performed */
-        assertTrue(syncNode.hasExactSongTuple(A_SONG_TUPLE));
+        assertTrue(participantUnderTest.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
     public void testReceiveValidCommit_updateRequest() throws Exception {
 
         /* proper precommit state for update request */
-        syncNode.addSong(A_SONG_TUPLE);
-        assertTrue(syncNode.hasExactSongTuple(A_SONG_TUPLE));
-        psm.setOngoingTransactionID(TXID);
-        psm.setPrecommitted(true);
+        participantUnderTest.addSong(A_SONG_TUPLE);
+        assertTrue(participantUnderTest.hasExactSongTuple(A_SONG_TUPLE));
+        participantSM.setOngoingTransactionID(TXID);
+        participantSM.setPrecommitted(true);
         final VoteRequest action = new UpdateRequest(A_SONG_NAME, SAME_SONG_NEW_URL, TXID, A_PEER_REFS);
-        psm.setAction(action);
+        participantSM.setAction(action);
 
         /* receive commit request */
         final Message msg = new CommitRequest(TXID);
         testReceiveFromCoordinator(msg);
 
         /* assert correct resulting state */
-        assertThat(syncNode.getDtLog().getLogAsString(), containsString("COMMIT"));
-        assertEquals(NO_ONGOING_TRANSACTION, psm.getOngoingTransactionID());
+        assertThat(participantUnderTest.getDtLog().getLogAsString(), containsString("COMMIT"));
+        assertEquals(NO_ONGOING_TRANSACTION, participantSM.getOngoingTransactionID());
         assertTrue(peerToCoordinator.getOutQueue().isEmpty());
 
         /* including action performed */
-        assertTrue(syncNode.hasExactSongTuple(SAME_SONG_NEW_URL));
-        assertFalse(syncNode.hasExactSongTuple(A_SONG_TUPLE));
+        assertTrue(participantUnderTest.hasExactSongTuple(SAME_SONG_NEW_URL));
+        assertFalse(participantUnderTest.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
     public void testReceiveValidCommit_deleteRequest() throws Exception {
 
         /* proper precommit state for delete request */
-        syncNode.addSong(A_SONG_TUPLE);
-        assertTrue(syncNode.hasExactSongTuple(A_SONG_TUPLE));
-        psm.setOngoingTransactionID(TXID);
-        psm.setPrecommitted(true);
+        participantUnderTest.addSong(A_SONG_TUPLE);
+        assertTrue(participantUnderTest.hasExactSongTuple(A_SONG_TUPLE));
+        participantSM.setOngoingTransactionID(TXID);
+        participantSM.setPrecommitted(true);
         final VoteRequest action = new DeleteRequest(A_SONG_NAME, TXID, A_PEER_REFS);
-        psm.setAction(action);
+        participantSM.setAction(action);
 
         /* receive commit request */
         final Message msg = new CommitRequest(TXID);
         testReceiveFromCoordinator(msg);
 
         /* assert correct resulting state */
-        assertThat(syncNode.getDtLog().getLogAsString(), containsString("COMMIT"));
-        assertEquals(NO_ONGOING_TRANSACTION, psm.getOngoingTransactionID());
+        assertThat(participantUnderTest.getDtLog().getLogAsString(), containsString("COMMIT"));
+        assertEquals(NO_ONGOING_TRANSACTION, participantSM.getOngoingTransactionID());
         assertTrue(peerToCoordinator.getOutQueue().isEmpty());
 
         /* including action performed */
-        assertFalse(syncNode.hasExactSongTuple(SAME_SONG_NEW_URL));
-        assertFalse(syncNode.hasExactSongTuple(A_SONG_TUPLE));
+        assertFalse(participantUnderTest.hasExactSongTuple(SAME_SONG_NEW_URL));
+        assertFalse(participantUnderTest.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
     public void testReceiveAbortAfterVotingYES() throws Exception {
 
         /* set up pre-abort msg state */
-        psm.setOngoingTransactionID(TXID);
+        participantSM.setOngoingTransactionID(TXID);
         final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
-        psm.setAction(action);
-        psm.setPeerSet(A_PEER_REFS);
+        participantSM.setAction(action);
+        participantSM.setPeerSet(A_PEER_REFS);
 
         /* receive abort msg */
         final Message msg = new Message(ABORT, TXID);
         testReceiveFromCoordinator(msg);
 
         /* assert correct resulting state */
-        assertEquals(NO_ONGOING_TRANSACTION, psm.getOngoingTransactionID());
-        assertNull(psm.getAction());
-        assertNull(psm.getPeerSet());
-        assertNull(psm.getUpSet());
-        assertThat(syncNode.getDtLog().getLogAsString(), containsString("ABORT"));
+        assertEquals(NO_ONGOING_TRANSACTION, participantSM.getOngoingTransactionID());
+        assertNull(participantSM.getAction());
+        assertNull(participantSM.getPeerSet());
+        assertNull(participantSM.getUpSet());
+        assertThat(participantUnderTest.getDtLog().getLogAsString(), containsString("ABORT"));
     }
 
     /**
@@ -354,36 +351,37 @@ public class ParticipantStateMachineTest extends TestCommon {
         int nextCoordID = queue.poll().getNodeID();
 
         /* timeout has triggered */
-        psm.setPeerSet(A_PEER_REFS);
+        participantSM.setPeerSet(A_PEER_REFS);
         int peerRefsInitialSize = A_PEER_REFS.size();
-        psm.setUpSet(psm.getPeerSet().stream().map(PeerReference::clone).collect(Collectors.toList()));
-        psm.setOngoingTransactionID(TXID);
 
-        psm.coordinatorTimeoutOnHeartbeat(coordinatorID);
+        participantSM.setUpSet(participantSM.getPeerSet()
+                        .stream()
+                        .map(PeerReference::clone)
+                        .collect(Collectors.toList()));
+
+        participantSM.setOngoingTransactionID(TXID);
+
+        participantSM.coordinatorTimeoutOnHeartbeat(coordinatorID);
 
 
         /* so the following state changes have occurred */
 
         /* failed coordinator was removed from upSet but not peerSet */
-        assertEquals(peerRefsInitialSize-1, psm.getUpSet().size());
-        assertEquals(peerRefsInitialSize, psm.getPeerSet().size());
+        assertEquals(peerRefsInitialSize-1, participantSM.getUpSet().size());
+        assertEquals(peerRefsInitialSize, participantSM.getPeerSet().size());
 
         /* this fact was logged */
-        assertThat(syncNode.getDtLog().getLogAsString(), containsString("TIMEOUT "+coordinatorID));
+        final String logAsString = participantUnderTest.getDtLog().getLogAsString();
+        assertThat(logAsString, containsString("TIMEOUT "+coordinatorID));
 
         /* connection established to the lowest node still in upSet */
-        Iterator<Connection> connectionIterator = syncNode.getPeerConns().iterator();
-        Connection newCoordConn = null;
-        while (connectionIterator.hasNext()) {
-            Connection conn = connectionIterator.next();
-            if (conn.getReceiverID() == nextCoordID) {
-                newCoordConn = conn;
-                break;
-            }
-        }
-        assertNotNull(newCoordConn);
 
-        QueueConnection qConn = (QueueConnection) newCoordConn;
+        QueueConnection qConn = (QueueConnection)
+                participantUnderTest.getPeerConns()
+                        .stream()
+                        .filter(conn -> conn.getReceiverID() == nextCoordID)
+                        .findFirst()
+                        .get();
 
         /* sent it a UR_ELECTED message */
         assertEquals(1, qConn.getOutQueue().size());
@@ -396,7 +394,7 @@ public class ParticipantStateMachineTest extends TestCommon {
 
         testReceiveFromCoordinator(new Message(UR_ELECTED, TXID));
 
-        assertTrue(syncNode.getStateMachine() instanceof CoordinatorStateMachine);
+        assertTrue(participantUnderTest.getStateMachine() instanceof CoordinatorStateMachine);
 
         /* TODO after the CoordinatorStateMachine has been fleshed-we'll need to verify
          *      that the transaction ID and command-action etc. have remained the same */
@@ -405,6 +403,6 @@ public class ParticipantStateMachineTest extends TestCommon {
     @Test
     public void testReceiveDUB_COORDINATOR() throws Exception {
         testReceiveFromCoordinator(new Message(DUB_COORDINATOR, -1));
-        assertTrue(syncNode.getStateMachine() instanceof CoordinatorStateMachine);
+        assertTrue(participantUnderTest.getStateMachine() instanceof CoordinatorStateMachine);
     }
 }

@@ -1,18 +1,28 @@
 package system;
 
 import messages.vote_req.AddRequest;
+import messages.vote_req.VoteRequest;
+import node.PeerReference;
 import org.junit.Test;
+import util.TestCommon;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.junit.Assert.assertTrue;
-import static util.TestCommon.A_PEER_REFS;
-import static util.TestCommon.A_SONG_TUPLE;
-import static util.TestCommon.TXID;
 
-public class SynchronousSystemTest {
+public class SynchronousSystemTest extends TestCommon {
+
     @Test
     public void testAddRequest() throws Exception {
-        AddRequest addRequest = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
-        final SynchronousSystem system = new SynchronousSystem(addRequest);
-        assertTrue(system.getResult());
+        final SynchronousSystem system = new SynchronousSystem(3);
+        List<PeerReference> peerReferences = system.txnMgr.getNodes()
+                                                          .stream()
+                                                          .map(mgrNode -> mgrNode.asPeerNode())
+                                                          .collect(Collectors.toList());
+
+        VoteRequest voteRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
+        assertTrue(system.handleRequest(voteRequest));
+
     }
 }

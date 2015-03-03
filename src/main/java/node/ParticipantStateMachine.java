@@ -14,8 +14,8 @@ import node.base.StateMachine;
 import system.network.Connection;
 
 import java.util.Collection;
-import java.util.Iterator;
 import java.util.PriorityQueue;
+import java.util.stream.Collectors;
 
 import static messages.Message.Command.UR_ELECTED;
 import static util.Common.NO_ONGOING_TRANSACTION;
@@ -173,14 +173,10 @@ public class ParticipantStateMachine extends StateMachine {
         setOngoingTransactionID(voteRequest.getTransactionID());
         setPeerSet(voteRequest.getCloneOfPeerSet());
         setUpSet(voteRequest.getCloneOfPeerSet());
-        logAndSend(new YesResponse(voteRequest));
-    }
-
-    private void logAndSend(Message message) {
-        node.log(message.getCommand().toString());
+        Message message = new YesResponse(voteRequest);
+        node.log("YES");
         currentConnection.sendMessage(message);
     }
-
 
     /* Getters and Setters */
 
@@ -232,17 +228,6 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     private void removeNodeWithIDFromUpset(int id) {
-        PeerReference toRemove = null;
-        Iterator<PeerReference> referenceIterator = getUpSet().iterator();
-        while (referenceIterator.hasNext()) {
-            PeerReference ref = referenceIterator.next();
-            if (ref.getNodeID() == id) {
-                toRemove = ref;
-                break;
-            }
-        }
-        if (toRemove != null) {
-            getUpSet().remove(toRemove);
-        }
+        upSet = upSet.stream().filter(c -> c.getNodeID() != id).collect(Collectors.toList());
     }
 }
