@@ -9,6 +9,7 @@ import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.CoordinatorStateMachine;
 import node.ElectionStateMachine;
+import node.LogRecoveryStateMachine;
 import node.ParticipantStateMachine;
 import node.PeerReference;
 import system.network.Connection;
@@ -62,6 +63,17 @@ public abstract class Node {
 
     public void setDtLog(DTLog dtLog) {
         this.dtLog = dtLog;
+    }
+    
+    public void recoverFromDtLog() {
+    	LogRecoveryStateMachine recoveryMachine = new LogRecoveryStateMachine(this);
+    	VoteRequest uncommitted = recoveryMachine.getUncommittedRequest();
+    	if (uncommitted == null || !recoveryMachine.didVoteYesOnRequest()) {
+    		stateMachine = new ParticipantStateMachine(this);
+    	}
+    	else {
+    		// start the recovery protocol
+    	}
     }
 
     public void logMessage(Message message) {
