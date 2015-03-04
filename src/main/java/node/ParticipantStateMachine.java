@@ -71,14 +71,12 @@ public class ParticipantStateMachine extends StateMachine {
 
             /* VOTE REQUESTS */
                 case ADD:
-                    receiveAddRequest((AddRequest) msg);
-                    break;
                 case UPDATE:
-                    receiveUpdateRequest((UpdateRequest) msg);
-                    break;
                 case DELETE:
-                    receiveDeleteRequest((DeleteRequest) msg);
-                    break;
+                    VoteRequest vote = (VoteRequest)msg;
+                     receiveVoteRequest(vote, node.getVoteValue(vote));
+                     break;
+
 
             /* OTHER */
                 case DUB_COORDINATOR:
@@ -148,7 +146,7 @@ public class ParticipantStateMachine extends StateMachine {
     private void receiveDeleteRequest(DeleteRequest deleteRequest) {
         receiveVoteRequest(deleteRequest, node.hasSong(deleteRequest.getSongName()));
     }
-
+    
     /**
      * doesn't log anything (Lecture 3, Pg. 13), send ACK
      */

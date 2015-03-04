@@ -9,10 +9,14 @@ import messages.NoResponse;
 import messages.PeerTimeout;
 import messages.YesResponse;
 import messages.vote_req.AddRequest;
+import messages.vote_req.DeleteRequest;
+import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.system.SyncNode;
+
 import org.junit.Before;
 import org.junit.Test;
+
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.network.QueueConnection;
 import system.network.QueueSocket;
@@ -34,9 +38,13 @@ public class CoordinatorStateMachineTest extends TestCommon {
     QueueConnection txnMgrToCoordinator;
     QueueConnection coordinatorToTxnMgr;
     ArrayList<PeerReference> coordinatorPeerReferences;
-    SongTuple song;
+    SongTuple song, updatedSong;
     VoteRequest request;
 
+    AddRequest add;
+    UpdateRequest update;
+    DeleteRequest delete;
+    
     @Before
     public void setUp() throws Exception {
         /* connect a syncNode to this test setup */
@@ -60,16 +68,28 @@ public class CoordinatorStateMachineTest extends TestCommon {
             syncNode.addConnection(coordinatorToPeer);
             coordinatorPeerReferences.add(new PeerReference(peerId, 0));
         }
+        
+		song = new SongTuple("song", "url");
+		updatedSong = new SongTuple("song", "updated");
+		
+		add = new AddRequest(song, TXID, coordinatorPeerReferences);
+		update = new UpdateRequest("song", updatedSong, TXID, coordinatorPeerReferences);
+		delete = new DeleteRequest("song", TXID, coordinatorPeerReferences);
     }
 
-    private void receiveCommandFromTransactionManager() {
-		song = new SongTuple("song", "url");
-		request = new AddRequest(song, TXID, coordinatorPeerReferences);
-        txnMgrToCoordinator.sendMessage(request);
+    private void receiveCommandFromTransactionManager(VoteRequest voteRequest) {
+    	request = voteRequest;
+        txnMgrToCoordinator.sendMessage(voteRequest);
 		assertTrue(csm.receiveMessage(coordinatorToTxnMgr));
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForVotes, csm.getState());
     }
-
+    
+    private void receiveFailingCommandFromTransactionManager(VoteRequest voteRequest) {
+        txnMgrToCoordinator.sendMessage(voteRequest);
+		assertTrue(csm.receiveMessage(coordinatorToTxnMgr));
+		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
+    }
+    
     private void peerRespondsWithYes(int peerIndex) {
 		peerQueueSockets[peerIndex].getConnectionToBID().sendMessage(new YesResponse(request));
 		assertTrue(csm.receiveMessage(peerQueueSockets[peerIndex].getConnectionToAID()));
@@ -90,13 +110,20 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		assertTrue(csm.receiveMessage(peerQueueSockets[peerIndex].getConnectionToAID()));
     }
 
-    private Message getLastMessageToPeer(int peerIndex) {
+    private Message getLastMessageInQueue(Queue<Message> queue) {
     	Message message;
-    	Queue<Message> queue = peerQueueSockets[peerIndex].getConnectionToAID().getOutQueue();
     	do {
     		message = queue.poll();
     	} while (queue.size() > 0);
-    	return message;
+    	return message;    	
+    }
+    
+    private Message getLastMesageToTxnMgr() {
+    	return getLastMessageInQueue(coordinatorToTxnMgr.getOutQueue());
+    }
+    
+    private Message getLastMessageToPeer(int peerIndex) {
+    	return getLastMessageInQueue(peerQueueSockets[peerIndex].getConnectionToAID().getOutQueue());
     }
 
     private Message getLastMessageLogged() {
@@ -106,7 +133,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 
 	@Test
 	public void testReceiveCommandFromTransactionManager_sendsVoteRequest() {
-		receiveCommandFromTransactionManager();
+		receiveCommandFromTransactionManager(add);
 
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForVotes, csm.getState());
         Message voteReq = getLastMessageToPeer(0);
@@ -119,7 +146,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 
 	@Test
 	public void testReceiveNotEnoughVotes_stillWaitingForVotes() {
-		receiveCommandFromTransactionManager();
+		receiveCommandFromTransactionManager(add);
 		peerRespondsWithYes(0);
 
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForVotes, csm.getState());
@@ -127,7 +154,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 
 	@Test
 	public void testReceiveEnoughYesVotes_sendsPrecommit() {
-		receiveCommandFromTransactionManager();
+		receiveCommandFromTransactionManager(add);
 		peerRespondsWithYes(0);
 		peerRespondsWithYes(1);
 
@@ -140,11 +167,13 @@ public class CoordinatorStateMachineTest extends TestCommon {
 
 	@Test
 	public void testTimeoutWhileWaitingForVotes_sendsAbortAndReturnsToInitialState() {
-		receiveCommandFromTransactionManager();
+		receiveCommandFromTransactionManager(add);
 		peerTimesOut(0);
 
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
 		Message abort = getLastMessageToPeer(1);
+		assertEquals(Message.Command.ABORT, abort.getCommand());
+		abort = getLastMesageToTxnMgr();
 		assertEquals(Message.Command.ABORT, abort.getCommand());
 		Message logged = getLastMessageLogged();
 		assertTrue(logged instanceof AbortRequest);
@@ -152,7 +181,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 
 	@Test
 	public void testReceiveNoVote_sendsAbortAndReturnsToInitialState() {
-		receiveCommandFromTransactionManager();
+		receiveCommandFromTransactionManager(add);
 		peerRespondsWithNo(0);
 
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
@@ -160,13 +189,15 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		assertEquals(Message.Command.ABORT, abort.getCommand());
 		abort = getLastMessageToPeer(1);
 		assertEquals(Message.Command.ABORT, abort.getCommand());
+		abort = getLastMesageToTxnMgr();
+		assertEquals(Message.Command.ABORT, abort.getCommand());
 		Message logged = getLastMessageLogged();
 		assertTrue(logged instanceof AbortRequest);
 	}
 
 	@Test
 	public void testReceiveNotEnoughAcks_stillWaitingForAcks() {
-		receiveCommandFromTransactionManager();
+		receiveCommandFromTransactionManager(add);
 		peerRespondsWithYes(0);
 		peerRespondsWithYes(1);
 		peerAcknowledgesPrecommit(0);
@@ -176,7 +207,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 
 	@Test
 	public void testReceiveEnoughAcks_sendsCommitAndReturnsToInitialState() {
-		receiveCommandFromTransactionManager();
+		receiveCommandFromTransactionManager(add);
 		peerRespondsWithYes(0);
 		peerRespondsWithYes(1);
 		peerAcknowledgesPrecommit(0);
@@ -187,13 +218,15 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		assertEquals(Message.Command.COMMIT, commit.getCommand());
 		commit = getLastMessageToPeer(1);
 		assertEquals(Message.Command.COMMIT, commit.getCommand());
+		commit = getLastMesageToTxnMgr();
+		assertEquals(Message.Command.COMMIT, commit.getCommand());
 		Message logged = getLastMessageLogged();
 		assertTrue(logged instanceof CommitRequest);
 	}
 
 	@Test
 	public void testReceiveAckAndTimeout_sendsCommitAndReturnsToInitialState() {
-		receiveCommandFromTransactionManager();
+		receiveCommandFromTransactionManager(add);
 		peerRespondsWithYes(0);
 		peerRespondsWithYes(1);
 		peerAcknowledgesPrecommit(0);
@@ -202,73 +235,89 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
 		Message commit = getLastMessageToPeer(0);
 		assertEquals(Message.Command.COMMIT, commit.getCommand());
+		commit = getLastMesageToTxnMgr();
+		assertEquals(Message.Command.COMMIT, commit.getCommand());
 		Message logged = getLastMessageLogged();
 		assertTrue(logged instanceof CommitRequest);
 	}
 
     @Test
-    public void testReceiveEnoughVotesButVoteNo_sendsAbortAndReturnsToInitialState() throws Exception {
-        // TODO node already has song to add in its state
-        receiveCommandFromTransactionManager();
+    public void testUpdateStateOnCommit_addSong() throws Exception {
+        receiveCommandFromTransactionManager(add);
         peerRespondsWithYes(0);
         peerRespondsWithYes(1);
-        throw new NotImplementedException();
-    }
-
-    @Test
-    public void testSendsCommitToTxnMgrToo() throws Exception {
-        throw new NotImplementedException();
-    }
-
-    @Test
-    public void testSendsAbortToTxnMgrToo() throws Exception {
-        throw new NotImplementedException();
-    }
-
-    @Test
-    public void testUpdateStateOnCommit_addSong() throws Exception {
-        receiveCommandFromTransactionManager();
-        // TODO the following
-        assertTrue(syncNode.hasExactSongTuple(A_SONG_TUPLE));
+        peerAcknowledgesPrecommit(0);
+        peerAcknowledgesPrecommit(1);
+        assertTrue(syncNode.hasExactSongTuple(song));
     }
 
     @Test
     public void testUpdateStateOnCommit_updateSong() throws Exception {
-        throw new NotImplementedException();
+    	syncNode.addSong(song);
+    	
+        receiveCommandFromTransactionManager(update);
+        peerRespondsWithYes(0);
+        peerRespondsWithYes(1);
+        peerAcknowledgesPrecommit(0);
+        peerAcknowledgesPrecommit(1);
+        assertTrue(syncNode.hasExactSongTuple(updatedSong));
     }
 
     @Test
     public void testUpdateStateOnCommit_deleteSong() throws Exception {
-        throw new NotImplementedException();
+    	syncNode.addSong(song);
+    	
+        receiveCommandFromTransactionManager(delete);
+        peerRespondsWithYes(0);
+        peerRespondsWithYes(1);
+        peerAcknowledgesPrecommit(0);
+        peerAcknowledgesPrecommit(1);
+        assertTrue(syncNode.hasNoSongs());
     }
 
     @Test
     public void testAbortRequestToAddExistingSong() throws Exception {
-        throw new NotImplementedException();
+    	syncNode.addSong(song);
+    	
+    	receiveFailingCommandFromTransactionManager(add);
+		Message abort = getLastMesageToTxnMgr();
+		assertEquals(Message.Command.ABORT, abort.getCommand());
+        assertTrue(syncNode.hasExactSongTuple(song));
     }
 
     @Test
     public void testAbortRequestToDeleteNonExistingSong() throws Exception {
-        throw new NotImplementedException();
+    	receiveFailingCommandFromTransactionManager(delete);
+		Message abort = getLastMesageToTxnMgr();
+		assertEquals(Message.Command.ABORT, abort.getCommand());
+        assertTrue(syncNode.hasNoSongs());
     }
 
     @Test
     public void testAbortRequestToUpdateNonExistingSong() throws Exception {
-        throw new NotImplementedException();
+    	receiveFailingCommandFromTransactionManager(update);
+		Message abort = getLastMesageToTxnMgr();
+		assertEquals(Message.Command.ABORT, abort.getCommand());
+        assertTrue(syncNode.hasNoSongs());
     }
 
     @Test
     public void testReceiveNOFromNodeAfterHavingAbortedTransaction() throws Exception {
-        throw new NotImplementedException();
+		receiveCommandFromTransactionManager(add);
+		peerRespondsWithNo(0);
+		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
+		
+		peerRespondsWithNo(1);
+		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
     }
 
     @Test
     public void testReceiveYESFromNodeAfterHavingAbortedTransaction() throws Exception {
-        throw new NotImplementedException();
-    }
-
-    @Test
-    public void testAbortAddRequestOnNonexistentSongAfterReceivingNOFromParticipant() throws Exception {
-        throw new NotImplementedException();
+		receiveCommandFromTransactionManager(add);
+		peerRespondsWithNo(0);
+		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
+		
+		peerRespondsWithYes(1);
+		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
     }
 }
