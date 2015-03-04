@@ -1,11 +1,9 @@
 package system;
 
 import messages.DubCoordinatorMessage;
-import messages.vote_req.AddRequest;
 import messages.vote_req.VoteRequest;
 import node.PeerReference;
 import system.network.Network;
-import util.SongTuple;
 
 import java.util.Collection;
 import java.util.List;
@@ -37,19 +35,6 @@ public abstract class TransactionManager {
         return null;
     }
 
-    /**
-     * returns true iff the song was successfully committed by all nodes
-     */
-    public Transaction addSong(SongTuple song) {
-        final AddRequest addRequest = new AddRequest(song, ++currentTxnID, nodesToPeerRefs());
-        coordinator.sendMessage(addRequest);
-        return new Transaction(addRequest) {
-            @Override boolean didCommit(boolean result) {
-                return result;
-            }
-        };
-    }
-
     private Collection<PeerReference> nodesToPeerRefs() {
         return nodes.stream().map(n -> new PeerReference(n.getNodeID(), n.getListenPort())).collect(Collectors.toList());
     }
@@ -60,14 +45,6 @@ public abstract class TransactionManager {
 
     public void processRequest(VoteRequest voteRequest) {
         coordinator.sendMessage(voteRequest);
-    }
-
-    abstract class Transaction {
-        VoteRequest voteRequest;
-        public Transaction(VoteRequest request) {
-            voteRequest = request;
-        }
-        abstract boolean didCommit(boolean result);
     }
 
     public void dubCoordinator(int nodeID) {

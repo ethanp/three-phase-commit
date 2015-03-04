@@ -5,7 +5,6 @@ import messages.CommitRequest;
 import messages.DubCoordinatorMessage;
 import messages.ElectedMessage;
 import messages.Message;
-import messages.PeerTimeout;
 import messages.PrecommitRequest;
 import messages.YesResponse;
 import messages.vote_req.AddRequest;
@@ -14,18 +13,16 @@ import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.system.SyncNode;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import system.network.QueueConnection;
 import system.network.QueueSocket;
+import util.Common;
 import util.SongTuple;
 import util.TestCommon;
 
-import java.util.PriorityQueue;
 import java.util.stream.Collectors;
 
 import static messages.Message.Command.ACK;
-import static messages.Message.Command.UR_ELECTED;
 import static messages.Message.Command.YES;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertEquals;
@@ -347,50 +344,28 @@ public class ParticipantStateMachineTest extends TestCommon {
      * to properly know how to emulate the triggering of the heartbeat and what really
      * should happen. This is a guess though.
      */
-    @Ignore // TODO change @Ignore to @Test after doing the async stuff
-    private void testCoordinatorTimeoutOnHeartbeat() throws Exception {
-
-        PriorityQueue<PeerReference> queue = new PriorityQueue<>(A_PEER_REFS);
-        int coordinatorID = queue.poll().getNodeID();
-        int nextCoordID = queue.poll().getNodeID();
-
-        /* timeout has triggered */
-        participantSM.setCoordinatorID(coordinatorID);
+    @Test
+    public void testReceiveCoordinatorTimeout() throws Exception {
+        final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
+        participantSM.setAction(action);
         participantSM.setPeerSet(A_PEER_REFS);
-        int peerRefsInitialSize = A_PEER_REFS.size();
-
         participantSM.setUpSet(participantSM.getPeerSet()
                                             .stream()
                                             .map(PeerReference::clone)
                                             .collect(Collectors.toList()));
+        final int coordID = A_PEER_REFS.iterator().next().getNodeID();
+        participantSM.setCoordinatorID(coordID);
 
-        participantSM.setOngoingTransactionID(TXID);
+        /* start the timer */
+        participantUnderTest.resetTimersFor(coordID);
 
-        testReceiveFromCoordinator(new PeerTimeout(coordinatorID));
+        /* wait until it runs out */
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS+200);
 
-        /* so the following state changes have occurred */
-
-        /* failed coordinator was removed from upSet but not peerSet */
-        assertEquals(peerRefsInitialSize-1, participantSM.getUpSet().size());
-        assertEquals(peerRefsInitialSize, participantSM.getPeerSet().size());
-
-        /* this fact was logged */
-        Message lastLoggedMessage = (Message)participantUnderTest.getDtLog().getLoggedMessages().toArray()[0];
-        assertTrue(lastLoggedMessage instanceof PeerTimeout);
-
-        /* connection established to the lowest node still in upSet */
-
-        QueueConnection qConn = (QueueConnection)
-                participantUnderTest.getPeerConns()
-                        .stream()
-                        .filter(conn -> conn.getReceiverID() == nextCoordID)
-                        .findFirst()
-                        .get();
-
-        /* sent it a UR_ELECTED message */
-        assertEquals(1, qConn.getOutQueue().size());
-        assertEquals(UR_ELECTED, qConn.getOutQueue().peek().getCommand());
-        assertEquals(TXID, qConn.getOutQueue().peek().getTransactionID());
+        final String logAsString = participantUnderTest.getDtLog().getLogAsString();
+        assertThat(logAsString, containsString("TIMEOUT"));
+        assertThat(logAsString, containsString(String.valueOf(coordID)));
+        assertTrue(participantUnderTest.getStateMachine() instanceof ElectionStateMachine);
     }
 
     @Test

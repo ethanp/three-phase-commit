@@ -41,19 +41,10 @@ public class ObjectConnection extends Connection {
     @Override public void sendMessage(Message o) {
         try {
             out.writeObject(o);
+            out.flush();
         }
         catch (IOException e) {
             e.printStackTrace();
-        }
-    }
-
-    public boolean messageWaiting() {
-        try {
-            return in.available() > 0;
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-            return false;
         }
     }
 

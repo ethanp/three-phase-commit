@@ -1,21 +1,32 @@
 package node.base;
 
 import messages.Message;
+import messages.PeerTimeout;
 import messages.TokenWriter;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.CoordinatorStateMachine;
+import node.ElectionStateMachine;
 import node.ParticipantStateMachine;
 import node.PeerReference;
 import system.network.Connection;
+import system.network.QueueConnection;
+import util.Common;
 import util.SongTuple;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
+
+import static util.Common.TIMEOUT_MONITOR_ID;
 
 /**
  * Ethan Petuchowski 2/27/15
@@ -26,14 +37,15 @@ public abstract class Node {
     protected final int myNodeID;
     protected final Set<SongTuple> playlist = new TreeSet<>();
     protected DTLog dtLog;
+    protected final TimeoutMonitor timeoutMonitor;
 
     protected Connection txnMgrConn;
-
     protected Collection<Connection> peerConns = new ArrayList<>();
 
     public Node(int myNodeID) {
         this.myNodeID = myNodeID;
         stateMachine = new ParticipantStateMachine(this);
+        this.timeoutMonitor = new TimeoutMonitor();
     }
 
     public void addConnection(Connection connection) {
@@ -133,7 +145,7 @@ public abstract class Node {
         addSong(updatedSong);
     }
 
-    protected synchronized boolean receiveMessageFrom(Connection connection) {
+    protected boolean receiveMessageFrom(Connection connection) {
         return stateMachine.receiveMessage(connection);
     }
 
@@ -176,5 +188,82 @@ public abstract class Node {
 
     public void setPeerConns(Collection<Connection> peerConns) {
         this.peerConns = peerConns;
+    }
+
+    public void resetTimersFor(int peerID) {
+        timeoutMonitor.resetTimersFor(peerID);
+    }
+
+    public void cancelTimersFor(int peerID) {
+        timeoutMonitor.cancelTimersFor(peerID);
+    }
+
+    // TODO make this actually do something
+    public void startElectionProtocol() {
+        stateMachine = new ElectionStateMachine();
+    }
+
+    private class TimeoutMonitor {
+
+        /* timers by peerID */
+        Map<Integer, List<Thread>> ongoingTimers = new HashMap<>();
+
+        void startTimer(int peerID) {
+            if (ongoingTimers.containsKey(peerID)) {
+                ongoingTimers.get(peerID).add(createTimer(peerID));
+            }
+            else {
+                ongoingTimers.put(peerID, new ArrayList<>(Arrays.asList(createTimer(peerID))));
+            }
+        }
+
+        void cancelTimersFor(int peerID) {
+            if (ongoingTimers.containsKey(peerID)) {
+                ongoingTimers.get(peerID).stream().forEach(Thread::interrupt);
+                ongoingTimers.remove(peerID);
+            }
+        }
+
+        void resetTimersFor(int peerID) {
+            cancelTimersFor(peerID);
+            startTimer(peerID);
+        }
+
+        private Thread createTimer(int peerID) {
+            final Thread thread = new Thread(new TimeoutTimer(peerID, Common.TIMEOUT_MILLISECONDS));
+            thread.start();
+            return thread;
+        }
+
+        class TimeoutTimer implements Runnable {
+
+            final int peerID;
+            final int milliseconds;
+
+            TimeoutTimer(int peerID, int milliseconds) {
+                this.peerID = peerID;
+                this.milliseconds = milliseconds;
+            }
+
+            @Override public void run() {
+                try {
+                    Thread.sleep(milliseconds);
+
+                    if (Thread.interrupted()) return;
+
+                    /* this means a Timeout DID occur */
+                    cancelTimersFor(peerID);
+
+                    receiveMessageFrom(
+                            new QueueConnection(
+                                    TIMEOUT_MONITOR_ID,
+                                    new LinkedList<>(Arrays.asList(new PeerTimeout(peerID))),
+                                    new LinkedList<>()));
+                }
+                catch (InterruptedException e) {
+                    /* this means a Timeout did NOT occur */
+                }
+            }
+        }
     }
 }

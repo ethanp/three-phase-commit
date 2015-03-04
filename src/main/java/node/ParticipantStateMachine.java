@@ -3,7 +3,6 @@ package node;
 import messages.AbortRequest;
 import messages.AckRequest;
 import messages.CommitRequest;
-import messages.ElectedMessage;
 import messages.Message;
 import messages.NoResponse;
 import messages.PeerTimeout;
@@ -52,45 +51,64 @@ public class ParticipantStateMachine extends StateMachine {
             return false;
         }
 
-        System.out.println("Node "+node.getMyNodeID()+" received a "+msg.getCommand());
+        synchronized (this) {
 
-        switch (msg.getCommand()) {
+            System.out.println("Node "+node.getMyNodeID()+" received a "+msg.getCommand());
+
+            /* if it's from the Coordinator, reset their timeout timer */
+            switch (msg.getCommand()) {
+                case ADD:
+                case UPDATE:
+                case DELETE:
+                case PRE_COMMIT:
+                    node.resetTimersFor(currentConnection.getReceiverID());
+                case ABORT:
+                case COMMIT:
+                    node.cancelTimersFor(currentConnection.getReceiverID());
+            }
+
+            switch (msg.getCommand()) {
 
             /* VOTE REQUESTS */
-            case ADD:
-            case UPDATE:
-            case DELETE:
-            	VoteRequest vote = (VoteRequest)msg;
-                receiveVoteRequest(vote, node.getVoteValue(vote));
-                break;
+                case ADD:
+                case UPDATE:
+                case DELETE:
+                    VoteRequest vote = (VoteRequest)msg;
+                     receiveVoteRequest(vote, node.getVoteValue(vote));
+                     break;
+
 
             /* OTHER */
-            case DUB_COORDINATOR:
-                receiveDubCoordinator(msg);
-                break;
-            case PRE_COMMIT:
-                receivePrecommit((PrecommitRequest) msg);
-                break;
-            case COMMIT:
-                receiveCommit((CommitRequest) msg);
-                break;
-            case ABORT:
-                receiveAbort(msg);
-                break;
-            case UR_ELECTED:
-                receiveUR_ELECTED(msg);
-                break;
-            case TIMEOUT:
-            	onTimeout((PeerTimeout)msg);
-            	break;
-            default:
-                throw new RuntimeException("Not a valid message: "+msg.getCommand());
+                case DUB_COORDINATOR:
+                    receiveDubCoordinator(msg);
+                    break;
+                case PRE_COMMIT:
+                    receivePrecommit((PrecommitRequest) msg);
+                    break;
+                case COMMIT:
+                    receiveCommit((CommitRequest) msg);
+                    break;
+                case ABORT:
+                    receiveAbort(msg);
+                    break;
+                case UR_ELECTED:
+                    receiveUR_ELECTED(msg);
+                    break;
+                case TIMEOUT:
+                    onTimeout((PeerTimeout) msg);
+                    break;
+                default:
+                    throw new RuntimeException("Not a valid message: "+msg.getCommand());
+            }
         }
 
         return true;
     }
 
     private void receiveUR_ELECTED(Message message) {
+
+        // TODO we can remove members of UP-set with peerID < myPeerID
+
         node.becomeCoordinator();
     }
 
@@ -204,11 +222,13 @@ public class ParticipantStateMachine extends StateMachine {
     private void onTimeout(PeerTimeout timeout) {
     	if (timeout.getPeerId() == coordinatorId) {
 	    	node.logMessage(timeout);
-	        removeNodeWithIDFromUpset(timeout.getPeerId());
-	        PeerReference lowestRemainingID = getNodeWithLowestIDInUpset();
-	        Connection conn = node.connectTo(lowestRemainingID);
-	        conn.sendMessage(new ElectedMessage(ongoingTransactionID));
+	        removeFromUpset(timeout.getPeerId());
+            node.startElectionProtocol();
     	}
+        else {
+            throw new RuntimeException("timeout on node ["+timeout.getPeerId()+"] "+
+                                       "not known to be coordinator");
+        }
     }
 
     private PeerReference getNodeWithLowestIDInUpset() {
@@ -217,7 +237,8 @@ public class ParticipantStateMachine extends StateMachine {
         return peerReferences.poll();
     }
 
-    private void removeNodeWithIDFromUpset(int id) {
+    private void removeFromUpset(int id) {
         upSet = upSet.stream().filter(c -> c.getNodeID() != id).collect(Collectors.toList());
+        // TODO upset removal must be logged
     }
 }
