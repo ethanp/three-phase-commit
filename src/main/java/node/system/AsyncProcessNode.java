@@ -44,6 +44,7 @@ public class AsyncProcessNode extends Node {
 
             /* tell the System my logical ID and listen port */
             txnMgrConn.sendMessage(new NodeMessage(getMyNodeID(), getListenPort()));
+            new Thread(new ConnectionListener((ObjectConnection)txnMgrConn)).start();
         }
         catch (IOException e) {
             L.OG("couldn't establish connection to the System");
@@ -68,12 +69,6 @@ public class AsyncProcessNode extends Node {
 
         @Override public void run() {
             while (true) {
-                while (!connection.messageWaiting()) try {
-                    Thread.sleep(Common.MESSAGE_DELAY);
-                }
-                catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
                 receiveMessageFrom(connection);
             }
         }
