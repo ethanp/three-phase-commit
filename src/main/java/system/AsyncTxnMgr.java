@@ -1,7 +1,10 @@
 package system;
 
+import console.CommandConsole;
 import node.system.AsyncLogger;
 import node.system.AsyncProcessNode;
+import system.failures.Failure;
+import system.failures.NoFailure;
 import util.Common;
 
 import java.io.IOException;
@@ -25,6 +28,12 @@ public class AsyncTxnMgr extends TransactionManager {
         nodesConnected.unlock();
     }
 
+    public AsyncTxnMgr(CommandConsole.Command command) {
+        this(command.getNumNodes());
+        failure = command.getFailureMode();
+        Common.MESSAGE_DELAY = command.getDelay();
+    }
+
     private void waitForAllNodesToConnect() {
         while (getNumConnectedNodes() < getNodes().size()) {
             try {
@@ -45,6 +54,8 @@ public class AsyncTxnMgr extends TransactionManager {
     final Condition coordinatorChosen = nodesConnected.newCondition();
     protected TxnMgrServer mgrServer;
     protected AsyncLogger L;
+
+    protected Failure failure = new NoFailure();
 
     long getNumConnectedNodes() {
         return nodes.stream().filter(n -> n.getConn() != null).count();

@@ -241,6 +241,5 @@ public class ParticipantStateMachine extends StateMachine {
 
     private void removeFromUpset(int id) {
         upSet = upSet.stream().filter(c -> c.getNodeID() != id).collect(Collectors.toList());
-        // TODO upset removal must be logged
     }
 }

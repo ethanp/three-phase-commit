@@ -1,5 +1,6 @@
 package system;
 
+import jdk.nashorn.internal.ir.annotations.Ignore;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
@@ -63,5 +64,84 @@ public class AsynchronousSystemTest extends TestCommon {
         assertEquals(COMMIT, system.processRequestToCompletion(addRequest).getCommand());
         VoteRequest deleteRequest = new DeleteRequest(A_SONG_NAME, TXID+1, peerReferences);
         assertEquals(COMMIT, system.processRequestToCompletion(deleteRequest).getCommand());
+    }
+
+
+
+    /* FAILURE CASES */
+
+    @Ignore
+    public void testCoordinatorFailsBeforeSendingVoteReq() throws Exception {
+
+    }
+
+    @Ignore
+    public void testParticipantFailsBeforeReceivingVoteReq() throws Exception {
+
+    }
+
+    @Ignore
+    public void testCoordinatorFailsAfterSendingAllVoteReqs() throws Exception {
+
+    }
+
+    @Ignore
+    public void testCoordinatorFailsAfterSendingSomeVoteReqs() throws Exception {
+
+    }
+
+    @Ignore
+    public void testParticipantFailsAfterReceivingVoteReq() throws Exception {
+
+    }
+
+    @Ignore
+    public void testParticipantFailsAfterLoggingNOBeforeSendingNO() throws Exception {
+
+    }
+
+    @Ignore
+    public void testParticipantFailsAfterLoggingYESBeforeSendingYES() throws Exception {
+
+    }
+
+    @Ignore
+    public void testParticipantFailsAfterSendingNO() throws Exception {
+
+    }
+
+    @Ignore
+    public void testParticipantFailsAfterSendingYES() throws Exception {
+
+    }
+
+    @Ignore
+    public void testCoordinatorFailsAfterReceivingNOBeforeSendingAbort() throws Exception {
+
+    }
+
+    @Ignore
+    public void testCoordinatorFailsAfterSendingAbortToEveryone() throws Exception {
+
+    }
+
+    @Ignore
+    public void testCoordinatorFailsAfterSendingAbortToOnlySome() throws Exception {
+
+    }
+
+    @Ignore
+    public void testCoordinatorFailsAfterReceivingYESesBeforeSendingPrecommit() throws Exception {
+
+    }
+
+    @Ignore
+    public void testCoordinatorFailsAfterSendingPrecommitToEveryone() throws Exception {
+
+    }
+
+    @Ignore
+    public void testCoordinatorFailsAfterSendingPrecommitToOnlySome() throws Exception {
+
     }
 }
