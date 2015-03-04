@@ -59,7 +59,8 @@ public abstract class DTLog {
 
     public Collection<Message> getLoggedMessages() {
     	ArrayList<Message> messages = new ArrayList<>();
-    	String[] logLines = getLogAsString().split("\n");
+    	String log = getLogAsString();
+    	String[] logLines = log.split("\n");
     	for (String line : logLines) {
     		String messageString = line.substring(line.lastIndexOf(']') + 2);
     		String[] messageTokens = messageString.split("  ");

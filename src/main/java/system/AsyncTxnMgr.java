@@ -1,6 +1,5 @@
 package system;
 
-import console.CommandConsole;
 import node.system.AsyncLogger;
 import node.system.AsyncProcessNode;
 import system.failures.Failure;
@@ -26,12 +25,6 @@ public class AsyncTxnMgr extends TransactionManager {
         nodesConnected.lock();
         coordinatorChosen.signalAll();
         nodesConnected.unlock();
-    }
-
-    public AsyncTxnMgr(CommandConsole.Command command) {
-        this(command.getNumNodes());
-        failure = command.getFailureMode();
-        Common.MESSAGE_DELAY = command.getDelay();
     }
 
     private void waitForAllNodesToConnect() {
