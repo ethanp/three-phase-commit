@@ -58,6 +58,19 @@ public abstract class Node {
         dtLog.endLog(writer);
     }
 
+    public boolean getVoteValue(VoteRequest vote) {
+    	switch (vote.getCommand()) {
+    	case ADD:
+    		return !hasSongTupleWithName(((AddRequest)vote).getSongTuple());
+    	case UPDATE:
+    		return hasSong(((UpdateRequest)vote).getSongName());
+    	case DELETE:
+    		return hasSong(((DeleteRequest)vote).getSongName());
+		default:
+    		return false;	
+    	}
+    }
+    
     public boolean hasSongTupleWithName(SongTuple tuple) {
         return playlist.contains(tuple);
     }
@@ -69,6 +82,10 @@ public abstract class Node {
             }
         }
         return false;
+    }
+    
+    public boolean hasNoSongs() {
+    	return playlist.size() == 0;
     }
 
     public boolean hasSong(String name) {
