@@ -166,4 +166,15 @@ public class RecoveryStateMachineTest extends TestCommon {
 		assertTrue(nodeUnderTest.hasExactSongTuple(songTuple));
 		assertTrue(nodeUnderTest.getStateMachine() instanceof ParticipantStateMachine);
 	}
+	
+	// remaining tests: put an add request and yes vote with no commit in log, then recover to get node into recovery state machine
+	// test that node sends old coordinator decision request
+	// test that when node receives decision, it follows it and switches to participant SM
+	// test that when node receives some uncertain/committable/timeout responses, it keeps sending decision requests
+	// test that when node receives uncertain/committable/timeouts from all peers, it delays and then tries again
+	// test that when node receives some recovering status, it updates its UP intersection set and keeps sending decision requests
+	// test that when node receives recovering status from all peers and the last to fail is up, it elects a leader and goes to participant recovery mode
+	// test that when node receives recovering status from all peers and the last to fail is not up:
+		// after subsequent decision requests, it sends status
+		// after receiving state request, it sends vote and goes into participant recovery mode
 }
