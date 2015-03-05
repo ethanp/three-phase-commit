@@ -14,6 +14,7 @@ import node.ParticipantRecoveryStateMachine;
 import node.ParticipantStateMachine;
 import node.PeerReference;
 import system.network.Connection;
+import system.network.MessageReceiver;
 import system.network.QueueConnection;
 import util.Common;
 import util.SongTuple;
@@ -33,7 +34,7 @@ import static util.Common.TIMEOUT_MONITOR_ID;
 /**
  * Ethan Petuchowski 2/27/15
  */
-public abstract class Node {
+public abstract class Node implements MessageReceiver {
 
     protected StateMachine stateMachine;
     protected final int myNodeID;
@@ -65,7 +66,7 @@ public abstract class Node {
     public void setDtLog(DTLog dtLog) {
         this.dtLog = dtLog;
     }
-    
+
     public void recoverFromDtLog() {
     	LogRecoveryStateMachine recoveryMachine = new LogRecoveryStateMachine(this);
     	VoteRequest uncommitted = recoveryMachine.getUncommittedRequest();
@@ -92,10 +93,10 @@ public abstract class Node {
     	case DELETE:
     		return hasSong(((DeleteRequest)vote).getSongName());
 		default:
-    		return false;	
+    		return false;
     	}
     }
-    
+
     public boolean hasSongTupleWithName(SongTuple tuple) {
         return playlist.contains(tuple);
     }
@@ -108,7 +109,7 @@ public abstract class Node {
         }
         return false;
     }
-    
+
     public boolean hasNoSongs() {
     	return playlist.size() == 0;
     }
@@ -158,14 +159,14 @@ public abstract class Node {
         addSong(updatedSong);
     }
 
-    protected boolean receiveMessageFrom(Connection connection) {
+    @Override public boolean receiveMessageFrom(Connection connection) {
         return stateMachine.receiveMessage(connection);
     }
 
     public void becomeCoordinator() {
         stateMachine = new CoordinatorStateMachine(this);
     }
-    
+
     public void becomeParticipant() {
     	stateMachine = new ParticipantStateMachine(this);
     }

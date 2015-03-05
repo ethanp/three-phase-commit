@@ -9,6 +9,8 @@ import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
 import system.network.Connection;
+import util.Common;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.stream.Collectors;
@@ -48,42 +50,53 @@ public class CoordinatorStateMachine extends StateMachine {
     		return false;
     	}
 
-        switch (message.getCommand()) {
-	        case ADD:
-            case UPDATE:
-            case DELETE:
-            	if (state == CoordinatorState.WaitingForCommand) {
-            		receivePlaylistCommand((VoteRequest)message);
-            		break;
-            	}
-            	else
-            		throw new RuntimeException("Received command when not waiting for one");
-            case YES:
-            	if (state == CoordinatorState.WaitingForVotes) {
-	            	++yesVotes;
-	            	checkForEnoughYesVotes();
-            	}
-                break;
-            case NO:
-            	if (state == CoordinatorState.WaitingForVotes) {
-            		abortCurrentTransaction();
-            	}
-                break;
-            case ACK:
-            	if (state == CoordinatorState.WaitingForAcks) {
-            		++acks;
-            		checkForEnoughAcks();
-            	}
-            	else
-            		throw new RuntimeException("Received ACK when not waiting for one");
-                break;
-            case TIMEOUT:
-            	int peerID = ((PeerTimeout)message).getPeerId();
-            	PeerReference ref = getPeerSet().stream().filter(pr -> pr.nodeID == peerID).findFirst().get();
-            	onTimeout(ref);
-            	break;
-            default:
-                throw new RuntimeException("invalid message for coordinator");
+        try { Thread.sleep(Common.MESSAGE_DELAY); }
+        catch (InterruptedException ignored) {}
+
+        synchronized (this) {
+            System.out.println("Coordinator "+ownerNode.getMyNodeID()+" "+
+                               "received a "+message.getCommand());
+
+            switch (message.getCommand()) {
+                case ADD:
+                case UPDATE:
+                case DELETE:
+                    if (state == CoordinatorState.WaitingForCommand) {
+                        receivePlaylistCommand((VoteRequest) message);
+                        break;
+                    }
+                    else
+                        throw new RuntimeException("Received command when not waiting for one");
+                case YES:
+                    if (state == CoordinatorState.WaitingForVotes) {
+                        ++yesVotes;
+                        checkForEnoughYesVotes();
+                    }
+                    break;
+                case NO:
+                    if (state == CoordinatorState.WaitingForVotes) {
+                        abortCurrentTransaction();
+                    }
+                    break;
+                case ACK:
+                    if (state == CoordinatorState.WaitingForAcks) {
+                        ++acks;
+                        checkForEnoughAcks();
+                    }
+                    else
+                        throw new RuntimeException("Received ACK when not waiting for one");
+                    break;
+                case TIMEOUT:
+                    int peerID = ((PeerTimeout) message).getPeerId();
+                    PeerReference ref = getPeerSet().stream()
+                                                    .filter(pr -> pr.nodeID == peerID)
+                                                    .findFirst()
+                                                    .get();
+                    onTimeout(ref);
+                    break;
+                default:
+                    throw new RuntimeException("invalid message for coordinator");
+            }
         }
         return true;
     }
@@ -118,23 +131,23 @@ public class CoordinatorStateMachine extends StateMachine {
 	                message.getPeerSet().stream()
 	                       .filter(ref -> ref.getNodeID() != ownerNode.getMyNodeID())
 	                       .collect(Collectors.toList());
-	
+
 	        Collection<Connection> conns = new ArrayList<>();
 	    	ownerNode.logMessage(message);
 	        /* connect to every peer the ownerNode is not already connected to */
 	        for (PeerReference reference : peerSet) {
-	
+
 	            Connection conn = ownerNode.isConnectedTo(reference)
 	                              ? ownerNode.getPeerConnForId(reference.nodeID)
 	                              : ownerNode.connectTo(reference);
-	
+
 	            conns.add(conn);
 	            conn.sendMessage(message);
 	        }
 	        setPeerSet(peerSet);
 	        txnConnections = conns;
 	        ownerNode.getPeerConns().addAll(txnConnections);
-	
+
 	        state = CoordinatorState.WaitingForVotes;
 	        action = message;
 	        ongoingTransactionID = message.getTransactionID();
@@ -176,7 +189,7 @@ public class CoordinatorStateMachine extends StateMachine {
 		if (acks >= peerSet.size()) {
 			CommitRequest commit = new CommitRequest(ongoingTransactionID);
 			ownerNode.logMessage(commit);
-			for (Connection connection : txnConnections) {
+            for (Connection connection : txnConnections) {
 				connection.sendMessage(commit);
 			}
             ownerNode.sendTxnMgrMsg(commit);

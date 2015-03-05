@@ -15,6 +15,7 @@ import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
 import system.network.Connection;
+import util.Common;
 
 import java.util.Collection;
 import java.util.PriorityQueue;
@@ -51,9 +52,12 @@ public class ParticipantStateMachine extends StateMachine {
             return false;
         }
 
+        try { Thread.sleep(Common.MESSAGE_DELAY); }
+        catch (InterruptedException ignored) {}
+
         synchronized (this) {
 
-            System.out.println("Node "+node.getMyNodeID()+" received a "+msg.getCommand());
+            System.out.println("Participant "+node.getMyNodeID()+" received a "+msg.getCommand());
 
             /* if it's from the Coordinator, reset their timeout timer */
             switch (msg.getCommand()) {
@@ -146,7 +150,7 @@ public class ParticipantStateMachine extends StateMachine {
     private void receiveDeleteRequest(DeleteRequest deleteRequest) {
         receiveVoteRequest(deleteRequest, node.hasSong(deleteRequest.getSongName()));
     }
-    
+
     /**
      * doesn't log anything (Lecture 3, Pg. 13), send ACK
      */
