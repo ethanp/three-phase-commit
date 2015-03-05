@@ -26,7 +26,7 @@ public class AsyncProcessNode extends Node {
 
     AsyncProcessNode(int systemListenPort, int myNodeID) {
         super(myNodeID);
-        dtLog = new FileDTLog(new File("logDir", String.valueOf(myNodeID)), this);
+        dtLog = new FileDTLog(new File(Common.LOG_DIR, String.valueOf(myNodeID)), this);
 
         /* start local server */
         nodeServer = new NodeServer();

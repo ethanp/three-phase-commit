@@ -107,6 +107,8 @@ public class AsyncTxnMgr extends TransactionManager {
     }
 
     public void receiveResponse(Message response) {
+
+        /* tell the `AsynchronousSystem` the result */
         transactionLock.lock();
         setTransactionResult(response);
         transactionComplete.signalAll();

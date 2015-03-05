@@ -5,6 +5,8 @@ import node.PeerReference;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.network.Connection;
 
+import java.io.EOFException;
+
 /**
  * Ethan Petuchowski 2/16/15
  */
@@ -42,7 +44,10 @@ public class ManagerNodeRef {
     }
 
     public Message receiveMessage() {
-        return getConn().receiveMessage();
+        try {
+            return getConn().receiveMessage();
+        }
+        catch (EOFException ignored) {return null;}
     }
 
     public PeerReference asPeerNode() {

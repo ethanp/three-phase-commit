@@ -17,7 +17,8 @@ public class Common {
     public static final int TIMEOUT_MILLISECONDS = 1000;
     static int reqPort = 3000;
     public static final int TXN_MGR_ID = 0;
-    public static long MESSAGE_DELAY = 300;
+    public static long MESSAGE_DELAY = 0;
+    public static String LOG_DIR = "logDir";
 
     public static ServerSocket claimOpenPort() {
         ServerSocket serverSocket = null;

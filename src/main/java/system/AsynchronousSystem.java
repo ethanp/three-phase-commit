@@ -52,4 +52,9 @@ public class AsynchronousSystem extends DistributedSystem {
         }
         return txnMgr.getTransactionResult();
     }
+
+    void killAllNodes() {
+        /* kill the nodes */
+        txnMgr.getNodes().stream().forEach(ManagerNodeRef::killNode);
+    }
 }
