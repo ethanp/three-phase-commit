@@ -7,8 +7,6 @@ import node.PeerReference;
 
 import java.util.Collection;
 
-import util.SongTuple;
-
 /**
  * Ethan Petuchowski 2/27/15
  */

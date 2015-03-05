@@ -34,7 +34,9 @@ public abstract class Message implements Serializable {
         UR_ELECTED,
         TIMEOUT,
         NODE, 
-        DECISION_REQUEST
+        DECISION_REQUEST, 
+        UNCERTAIN, 
+        IN_RECOVERY
     }
     Command command;
 

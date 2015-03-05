@@ -73,7 +73,7 @@ public abstract class Node {
     		stateMachine = new ParticipantStateMachine(this);
     	}
     	else {
-    		stateMachine = new ParticipantRecoveryStateMachine(this, uncommitted);
+    		stateMachine = new ParticipantRecoveryStateMachine(this, uncommitted, recoveryMachine.getLastUpSet());
     	}
     }
 

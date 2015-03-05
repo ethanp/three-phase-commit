@@ -3,15 +3,20 @@ package node;
 import static org.junit.Assert.*;
 
 import java.util.ArrayList;
+import java.util.Collection;
 
 import messages.AbortRequest;
 import messages.CommitRequest;
+import messages.InRecoveryResponse;
 import messages.Message;
+import messages.PeerTimeout;
+import messages.PrecommitRequest;
+import messages.UncertainResponse;
 import messages.YesResponse;
+import messages.Message.Command;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
-import node.base.DTLog;
 import node.mock.ByteArrayDTLog;
 import node.system.SyncNode;
 
@@ -26,22 +31,14 @@ import util.TestCommon;
 public class RecoveryStateMachineTest extends TestCommon {
 	
     SyncNode nodeUnderTest;
-    //ParticipantStateMachine participantSM;
-    QueueSocket queueSocket;
     QueueSocket[] peerQueueSockets;
-    QueueConnection peerToCoordinator;
-    QueueConnection coordinatorToPeer;
     ArrayList<PeerReference> peerReferences;
     SongTuple songTuple, updated;
+    ParticipantRecoveryStateMachine prsm;
     
     @Before
     public void setUp() throws Exception {
         nodeUnderTest = new SyncNode(TEST_PEER_ID, null);
-        //participantSM = (ParticipantStateMachine) nodeUnderTest.getStateMachine();
-        queueSocket = new QueueSocket(TEST_COORD_ID, TEST_PEER_ID);
-        peerToCoordinator = queueSocket.getConnectionToAID();
-        nodeUnderTest.addConnection(peerToCoordinator);
-        coordinatorToPeer = queueSocket.getConnectionToBID();
         
         peerQueueSockets = new QueueSocket[3];
         peerReferences = new ArrayList<PeerReference>();
@@ -177,64 +174,131 @@ public class RecoveryStateMachineTest extends TestCommon {
 		assertTrue(nodeUnderTest.getStateMachine() instanceof ParticipantStateMachine);
 	}
 	
-	private DTLog createLogWithUncommittedAdd() {
+	private void setupLogWithUncommittedAdd() {
 		SyncNode stubNode = new SyncNode(TEST_PEER_ID, null);
         AddRequest add = new AddRequest(songTuple, TXID, peerReferences);
         stubNode.logMessage(add);
         stubNode.logMessage(new YesResponse(add));
-		return stubNode.getDtLog();		
+		nodeUnderTest.setDtLog(stubNode.getDtLog());
+		nodeUnderTest.recoverFromDtLog();		
+		prsm = (ParticipantRecoveryStateMachine)nodeUnderTest.getStateMachine();
+		assertTrue(prsm != null);
+	}
+	
+    private void peerRespondsWith(int peerIndex, Message response) {
+		peerQueueSockets[peerIndex].getConnectionToBID().sendMessage(response);
+		assertTrue(prsm.receiveMessage(peerQueueSockets[peerIndex].getConnectionToAID()));
+    }    
+    
+    private Message getLastMessageToPeer(int peerIndex) {
+    	return getLastMessageInQueue(peerQueueSockets[peerIndex].getConnectionToAID().getOutQueue());
+    }
+    
+	@Test
+	public void node_recoverFromUncommittedRequest_upSetIntersectionContainsPeersFromRequest() {
+		setupLogWithUncommittedAdd();
+        Collection<Integer> upSet = prsm.getUpSetIntersection();
+        assertEquals(3, upSet.size());
+        assertTrue(upSet.contains(2));
+        assertTrue(upSet.contains(3));
+        assertTrue(upSet.contains(4));
 	}
 	
 	@Test
-	public void node_recoverFromUncommittedRequest_sendsDecisionRequestToFirstPeer() {		
-		DTLog mockLog = createLogWithUncommittedAdd();		
-		nodeUnderTest.setDtLog(mockLog);
-		nodeUnderTest.recoverFromDtLog();		
-		assertTrue(nodeUnderTest.getStateMachine() instanceof ParticipantRecoveryStateMachine);
-		
-        QueueConnection toFirstPeer = peerQueueSockets[1].getConnectionToAID();
-        Message lastToPeer = getLastMessageInQueue(toFirstPeer.getOutQueue());
+	public void node_recoverFromUncommittedRequest_sendsDecisionRequestToFirstPeer() {
+		setupLogWithUncommittedAdd();
+        Message lastToPeer = getLastMessageToPeer(1);
         assertEquals(Message.Command.DECISION_REQUEST, lastToPeer.getCommand());
 	}
 	
 	@Test
 	public void node_recoverFromUncommittedRequest_receivesCommitDecision_followsDecision() {		
-		DTLog mockLog = createLogWithUncommittedAdd();		
-		nodeUnderTest.setDtLog(mockLog);
-		nodeUnderTest.recoverFromDtLog();		
-		assertTrue(nodeUnderTest.getStateMachine() instanceof ParticipantRecoveryStateMachine);
-		
-		ParticipantRecoveryStateMachine prsm = (ParticipantRecoveryStateMachine)nodeUnderTest.getStateMachine();
-        QueueConnection fromFirstPeer = peerQueueSockets[1].getConnectionToBID();
-        
-        fromFirstPeer.sendMessage(new CommitRequest(TXID));
-        assertTrue(prsm.receiveMessage(peerQueueSockets[1].getConnectionToAID()));
+		setupLogWithUncommittedAdd();		
+		peerRespondsWith(1, new CommitRequest(TXID));
         assertTrue(nodeUnderTest.hasExactSongTuple(songTuple));
         assertTrue("node should now be a participant", nodeUnderTest.getStateMachine() instanceof ParticipantStateMachine);
 	}	
 	
 	@Test
 	public void node_recoverFromUncommittedRequest_receivesAbortDecision_followsDecision() {		
-		DTLog mockLog = createLogWithUncommittedAdd();		
-		nodeUnderTest.setDtLog(mockLog);
-		nodeUnderTest.recoverFromDtLog();
-		assertTrue(nodeUnderTest.getStateMachine() instanceof ParticipantRecoveryStateMachine);
+		setupLogWithUncommittedAdd();		
+		peerRespondsWith(1, new AbortRequest(TXID));
+        assertTrue(nodeUnderTest.hasNoSongs());
+        assertTrue("node should now be a participant", nodeUnderTest.getStateMachine() instanceof ParticipantStateMachine);
+	}	
+	
+	@Test
+	public void node_recoverFromUncommittedRequest_firstPeerUncertain_asksSecondPeer() {		
+		setupLogWithUncommittedAdd();		
+		peerRespondsWith(1, new UncertainResponse(TXID));
+		Message lastToSecondPeer = getLastMessageToPeer(2);
+		assertEquals(Command.DECISION_REQUEST, lastToSecondPeer.getCommand());
+	}
+	
+	@Test
+	public void node_recoverFromUncommittedRequest_firstPeerPrecommitted_asksSecondPeer() {		
+		setupLogWithUncommittedAdd();		
+		peerRespondsWith(1, new PrecommitRequest(TXID));
+		Message lastToSecondPeer = getLastMessageToPeer(2);
+		assertEquals(Command.DECISION_REQUEST, lastToSecondPeer.getCommand());
+	}	
+	
+	@Test
+	public void node_recoverFromUncommittedRequest_firstPeerTimesOut_asksSecondPeer() {		
+		setupLogWithUncommittedAdd();		
+		peerRespondsWith(1, new PeerTimeout(3));
+		Message lastToSecondPeer = getLastMessageToPeer(2);
+		assertEquals(Command.DECISION_REQUEST, lastToSecondPeer.getCommand());
+	}		
+	
+	@Test
+	public void node_recoverFromUncommittedRequest_firstPeerUncertainAndSecondSendsAbort_followsDecision() {		
+		setupLogWithUncommittedAdd();		
+		peerRespondsWith(1, new UncertainResponse(TXID));
+		peerRespondsWith(2, new AbortRequest(TXID));
+        assertTrue(nodeUnderTest.hasNoSongs());
+        assertTrue("node should now be a participant", nodeUnderTest.getStateMachine() instanceof ParticipantStateMachine);
+	}
+	
+	@Test
+	public void node_recoverFromUncommittedRequest_allPeersUncertain_triesFirstPeerAgain() {		
+		setupLogWithUncommittedAdd();
+		Message lastToFirstPeer = getLastMessageToPeer(1);
+		peerRespondsWith(1, new UncertainResponse(TXID));
+		peerRespondsWith(2, new UncertainResponse(TXID));
+		// NOTE: we're not checking the waiting part of this
+		lastToFirstPeer = getLastMessageToPeer(1);
+		assertEquals(Command.DECISION_REQUEST, lastToFirstPeer.getCommand());
+	}
+	
+	@Test
+	public void node_recoverFromUncommittedRequest_firstPeerInRecovery_updatesUpSetAndAsksSecondPeer() {		
+		setupLogWithUncommittedAdd();
+		ArrayList<Integer> peerUpSet = new ArrayList<Integer>();
+		peerUpSet.add(3);
+		peerUpSet.add(4);
 		
-		ParticipantRecoveryStateMachine prsm = (ParticipantRecoveryStateMachine)nodeUnderTest.getStateMachine();
-        QueueConnection fromFirstPeer = peerQueueSockets[1].getConnectionToBID();
-        
-        fromFirstPeer.sendMessage(new AbortRequest(TXID));
-        assertTrue(prsm.receiveMessage(peerQueueSockets[1].getConnectionToAID()));
+		peerRespondsWith(1, new InRecoveryResponse(TXID, peerUpSet));
+		Message lastToSecondPeer = getLastMessageToPeer(2);
+		assertEquals(Command.DECISION_REQUEST, lastToSecondPeer.getCommand());
+		
+		Collection<Integer> updatedUpSet = prsm.getUpSetIntersection();
+		assertEquals(2, updatedUpSet.size());
+		assertTrue(updatedUpSet.contains(3));
+		assertTrue(updatedUpSet.contains(4));
+	}
+	
+	@Test
+	public void node_recoverFromUncommittedRequest_firstPeerInRecoveryAndSecondSendsAbort_followsDecision() {		
+		setupLogWithUncommittedAdd();		
+		peerRespondsWith(1, new InRecoveryResponse(TXID, new ArrayList<Integer>()));
+		peerRespondsWith(2, new AbortRequest(TXID));
         assertTrue(nodeUnderTest.hasNoSongs());
         assertTrue("node should now be a participant", nodeUnderTest.getStateMachine() instanceof ParticipantStateMachine);
 	}
 	
 	// remaining tests: put an add request and yes vote with no commit in log, then recover to get node into recovery state machine
-	// test that node sends old coordinator decision request
-	// test that when node receives decision, it follows it and switches to participant SM
-	// test that when node receives some uncertain/committable/timeout responses, it keeps sending decision requests
-	// test that when node receives uncertain/committable/timeouts from all peers, it delays and then tries again
-	// test that when node receives some recovering status, it updates its UP intersection set and keeps sending decision requests
+	
 	// test that when node receives recovering status from all peers and the last to fail is up, it elects a leader and goes to participant recovery mode
 	// test that when node receives recovering status from all peers and the last to fail is not up:
 		// after subsequent decision requests, it sends status
