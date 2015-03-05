@@ -1,5 +1,6 @@
 package system;
 
+import console.CommandConsole;
 import messages.DubCoordinatorMessage;
 import messages.vote_req.VoteRequest;
 import node.PeerReference;
@@ -19,11 +20,13 @@ public abstract class TransactionManager {
     protected List<ManagerNodeRef> nodes;
     protected Network network;
     protected ManagerNodeRef coordinator;
+    protected CommandConsole console;
 
     protected int currentTxnID;
 
     public TransactionManager(int numNodes) {
         nodes = createNodes(numNodes);
+        console = new CommandConsole(this);
     }
 
     public abstract List<ManagerNodeRef> createNodes(int numNodes);

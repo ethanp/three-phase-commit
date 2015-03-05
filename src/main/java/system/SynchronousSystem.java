@@ -18,12 +18,14 @@ public class SynchronousSystem extends DistributedSystem {
     }
 
     @Override Message processRequestToCompletion(VoteRequest voteRequest) {
-        Message result;
+        Message result = null;
         boolean noTick;
         txnMgr.processRequest(voteRequest);
         for (int i = 0; i < MAX_TICKS; i++) {
             noTick = true;
-            result = txnMgr.tick();
+            Message partialResult = txnMgr.tick();
+            if (partialResult != null)
+                result = partialResult;
             for (ManagerNodeRef node : txnMgr.getNodes()) {
                 noTick &= ((SyncManagerNodeRef) node).tick();
             }
