@@ -1,12 +1,15 @@
 package util;
 
+import messages.Message;
 import node.PeerReference;
+
 import org.junit.Rule;
 import org.junit.rules.ExpectedException;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Queue;
 
 /**
  * Ethan Petuchowski 2/28/15
@@ -24,5 +27,13 @@ public class TestCommon {
     public final static SongTuple SAME_SONG_NEW_URL = new SongTuple(A_SONG_NAME, DIFFERENT_URL);
     public static final int TEST_PEER_ID = 2;
     public static final int TEST_COORD_ID = 1;
-    @Rule public ExpectedException exception = ExpectedException.none();
+    @Rule public ExpectedException exception = ExpectedException.none();    
+
+    protected Message getLastMessageInQueue(Queue<Message> queue) {
+    	Message message;
+    	do {
+    		message = queue.poll();
+    	} while (queue.size() > 0);
+    	return message;    	
+    }
 }

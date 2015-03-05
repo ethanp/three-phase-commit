@@ -6,10 +6,12 @@ import java.util.ArrayList;
 
 import messages.AbortRequest;
 import messages.CommitRequest;
+import messages.Message;
 import messages.YesResponse;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
+import node.base.DTLog;
 import node.mock.ByteArrayDTLog;
 import node.system.SyncNode;
 
@@ -26,6 +28,7 @@ public class RecoveryStateMachineTest extends TestCommon {
     SyncNode nodeUnderTest;
     //ParticipantStateMachine participantSM;
     QueueSocket queueSocket;
+    QueueSocket[] peerQueueSockets;
     QueueConnection peerToCoordinator;
     QueueConnection coordinatorToPeer;
     ArrayList<PeerReference> peerReferences;
@@ -40,11 +43,18 @@ public class RecoveryStateMachineTest extends TestCommon {
         nodeUnderTest.addConnection(peerToCoordinator);
         coordinatorToPeer = queueSocket.getConnectionToBID();
         
+        peerQueueSockets = new QueueSocket[3];
         peerReferences = new ArrayList<PeerReference>();
-        for (int i = 0; i < 2; ++i) {
+        for (int i = 0; i < 3; ++i) {
         	final int peerId = i + 2;
+        	if (i != 0) {
+	        	peerQueueSockets[i] = new QueueSocket(peerId, TEST_PEER_ID);
+	            QueueConnection toOtherPeer = peerQueueSockets[i].getConnectionToAID();
+	            nodeUnderTest.addConnection(toOtherPeer);
+        	}
             peerReferences.add(new PeerReference(peerId, 0));
         }
+        
         songTuple = new SongTuple("song", "url");
         updated = new SongTuple("song", "updated");
     }
@@ -165,6 +175,58 @@ public class RecoveryStateMachineTest extends TestCommon {
 		
 		assertTrue(nodeUnderTest.hasExactSongTuple(songTuple));
 		assertTrue(nodeUnderTest.getStateMachine() instanceof ParticipantStateMachine);
+	}
+	
+	private DTLog createLogWithUncommittedAdd() {
+		SyncNode stubNode = new SyncNode(TEST_PEER_ID, null);
+        AddRequest add = new AddRequest(songTuple, TXID, peerReferences);
+        stubNode.logMessage(add);
+        stubNode.logMessage(new YesResponse(add));
+		return stubNode.getDtLog();		
+	}
+	
+	@Test
+	public void node_recoverFromUncommittedRequest_sendsDecisionRequestToFirstPeer() {		
+		DTLog mockLog = createLogWithUncommittedAdd();		
+		nodeUnderTest.setDtLog(mockLog);
+		nodeUnderTest.recoverFromDtLog();		
+		assertTrue(nodeUnderTest.getStateMachine() instanceof ParticipantRecoveryStateMachine);
+		
+        QueueConnection toFirstPeer = peerQueueSockets[1].getConnectionToAID();
+        Message lastToPeer = getLastMessageInQueue(toFirstPeer.getOutQueue());
+        assertEquals(Message.Command.DECISION_REQUEST, lastToPeer.getCommand());
+	}
+	
+	@Test
+	public void node_recoverFromUncommittedRequest_receivesCommitDecision_followsDecision() {		
+		DTLog mockLog = createLogWithUncommittedAdd();		
+		nodeUnderTest.setDtLog(mockLog);
+		nodeUnderTest.recoverFromDtLog();		
+		assertTrue(nodeUnderTest.getStateMachine() instanceof ParticipantRecoveryStateMachine);
+		
+		ParticipantRecoveryStateMachine prsm = (ParticipantRecoveryStateMachine)nodeUnderTest.getStateMachine();
+        QueueConnection fromFirstPeer = peerQueueSockets[1].getConnectionToBID();
+        
+        fromFirstPeer.sendMessage(new CommitRequest(TXID));
+        assertTrue(prsm.receiveMessage(peerQueueSockets[1].getConnectionToAID()));
+        assertTrue(nodeUnderTest.hasExactSongTuple(songTuple));
+        assertTrue("node should now be a participant", nodeUnderTest.getStateMachine() instanceof ParticipantStateMachine);
+	}	
+	
+	@Test
+	public void node_recoverFromUncommittedRequest_receivesAbortDecision_followsDecision() {		
+		DTLog mockLog = createLogWithUncommittedAdd();		
+		nodeUnderTest.setDtLog(mockLog);
+		nodeUnderTest.recoverFromDtLog();
+		assertTrue(nodeUnderTest.getStateMachine() instanceof ParticipantRecoveryStateMachine);
+		
+		ParticipantRecoveryStateMachine prsm = (ParticipantRecoveryStateMachine)nodeUnderTest.getStateMachine();
+        QueueConnection fromFirstPeer = peerQueueSockets[1].getConnectionToBID();
+        
+        fromFirstPeer.sendMessage(new AbortRequest(TXID));
+        assertTrue(prsm.receiveMessage(peerQueueSockets[1].getConnectionToAID()));
+        assertTrue(nodeUnderTest.hasNoSongs());
+        assertTrue("node should now be a participant", nodeUnderTest.getStateMachine() instanceof ParticipantStateMachine);
 	}
 	
 	// remaining tests: put an add request and yes vote with no commit in log, then recover to get node into recovery state machine
