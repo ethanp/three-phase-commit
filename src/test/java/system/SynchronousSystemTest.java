@@ -133,7 +133,7 @@ public class SynchronousSystemTest extends TestCommon {
         assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
 
         assertFalse(coordinator.hasExactSongTuple(A_SONG_TUPLE));
-        assertFalse(participant.hasExactSongTuple(A_SONG_TUPLE));
+        assertTrue(participant.hasExactSongTuple(A_SONG_TUPLE));
     }
 
     @Test
@@ -162,6 +162,8 @@ public class SynchronousSystemTest extends TestCommon {
 
     @Test
     public void testReceiveAbortWhenDeletingPartiallyReplicatedSong_onlyCoordinatorIsMissingIt() throws Exception {
+
+        participant.addSong(A_SONG_TUPLE);
 
         VoteRequest voteRequest = new DeleteRequest(A_SONG_NAME, TXID, peerReferences);
         assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
