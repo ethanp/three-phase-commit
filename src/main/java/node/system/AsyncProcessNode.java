@@ -3,7 +3,6 @@ package node.system;
 import messages.NodeMessage;
 import node.PeerReference;
 import node.base.Node;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.network.Connection;
 import system.network.ObjectConnection;
 import util.Common;
@@ -13,6 +12,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 
+import static util.Common.LOCALHOST;
 import static util.Common.TXN_MGR_ID;
 
 
@@ -44,7 +44,7 @@ public class AsyncProcessNode extends Node {
 
             /* tell the System my logical ID and listen port */
             txnMgrConn.sendMessage(new NodeMessage(getMyNodeID(), getListenPort()));
-            new Thread(new ConnectionListener((ObjectConnection)txnMgrConn)).start();
+            new Thread(new ConnectionListener(this, (ObjectConnection)txnMgrConn)).start();
         }
         catch (IOException e) {
             L.OG("couldn't establish connection to the System");
@@ -58,20 +58,7 @@ public class AsyncProcessNode extends Node {
 
     @Override public void addConnection(Connection connection) {
         super.addConnection(connection);
-        new Thread(new ConnectionListener((ObjectConnection)connection)).start();
-    }
-
-    class ConnectionListener implements Runnable {
-        ObjectConnection connection;
-        ConnectionListener(ObjectConnection connection) {
-            this.connection = connection;
-        }
-
-        @Override public void run() {
-            while (true) {
-                receiveMessageFrom(connection);
-            }
-        }
+        new Thread(new ConnectionListener(this, (ObjectConnection)connection)).start();
     }
 
     /**
@@ -81,10 +68,23 @@ public class AsyncProcessNode extends Node {
      * In the synchronous case, this means directly adding each end of the QueueSocket to each
      * peer's `peerConns` collection
      * <p>
-     * In the asynchronous case, it means establishing a socket with the referenced peer's server
+     * In the asynchronous case, it means (SYNCHRONOUSLY) establishing a socket with the referenced
+     * peer's server
      */
     @Override public Connection connectTo(PeerReference peerReference) {
-        throw new NotImplementedException();
+        try {
+            final ObjectConnection connection = new ObjectConnection(
+                    new Socket(LOCALHOST, peerReference.getListeningPort()),
+                    peerReference.getNodeID());
+            addConnection(connection);
+            return connection;
+        }
+        catch (IOException e) {
+            System.err.println("Couldn't connect to peer "+peerReference.getNodeID()+" "+
+                               "on port "+peerReference.getListeningPort());
+            e.printStackTrace();
+            return null;
+        }
     }
 
     class NodeServer implements Runnable {

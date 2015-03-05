@@ -1,5 +1,6 @@
 package system;
 
+import messages.Message;
 import node.system.AsyncLogger;
 import node.system.AsyncProcessNode;
 import system.failures.Failure;
@@ -45,6 +46,11 @@ public class AsyncTxnMgr extends TransactionManager {
     final Lock nodesConnected = new ReentrantLock();
     final Condition allNodesConnected = nodesConnected.newCondition();
     final Condition coordinatorChosen = nodesConnected.newCondition();
+
+    final Lock transactionLock = new ReentrantLock();
+    final Condition transactionComplete = transactionLock.newCondition();
+    private Message transactionResult = null;
+
     protected TxnMgrServer mgrServer;
     protected AsyncLogger L;
 
@@ -98,5 +104,20 @@ public class AsyncTxnMgr extends TransactionManager {
         L = new AsyncLogger(Common.TXN_MGR_ID, mgrServer.getListenPort());
         L.OG("Server started");
         new Thread(mgrServer).start();
+    }
+
+    public void receiveResponse(Message response) {
+        transactionLock.lock();
+        setTransactionResult(response);
+        transactionComplete.signalAll();
+        transactionLock.unlock();
+    }
+
+    public Message getTransactionResult() {
+        return transactionResult;
+    }
+
+    public void setTransactionResult(Message transactionResult) {
+        this.transactionResult = transactionResult;
     }
 }
