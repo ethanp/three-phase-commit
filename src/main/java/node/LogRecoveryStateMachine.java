@@ -1,6 +1,9 @@
 package node;
 
+import java.util.Collection;
+
 import messages.Message;
+import messages.PeerTimeout;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
@@ -11,6 +14,7 @@ import node.base.Node;
 public class LogRecoveryStateMachine {
 	
 	private VoteRequest currentRequest;
+	private Collection<PeerReference> lastUpSet;
 	private Node node;
 	private boolean votedYes;
 	
@@ -25,6 +29,10 @@ public class LogRecoveryStateMachine {
 		return currentRequest;
 	}
 	
+	public Collection<PeerReference> getLastUpSet() {
+		return lastUpSet;
+	}
+	
 	public boolean didVoteYesOnRequest() {
 		return votedYes;
 	}
@@ -36,6 +44,7 @@ public class LogRecoveryStateMachine {
 		case UPDATE:
 			if (currentRequest == null) {
 				currentRequest = (VoteRequest)message;
+				lastUpSet = ((VoteRequest)message).getCloneOfPeerSet();
 				votedYes = false;
 			}
 			else
@@ -61,11 +70,16 @@ public class LogRecoveryStateMachine {
 				votedYes = true;
 			}
 			break;
+		case TIMEOUT:
+			if (currentRequest != null) {
+				PeerTimeout timeout = (PeerTimeout)message;
+				lastUpSet.removeIf(ref -> ref.getNodeID() == timeout.getPeerId());
+			}
+			break;
 		case ACK:
 		case DUB_COORDINATOR:
 		case NO:
 		case PRE_COMMIT:
-		case TIMEOUT:
 		case UR_ELECTED:
 			break;
 		default:

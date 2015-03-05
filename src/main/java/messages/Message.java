@@ -33,7 +33,10 @@ public abstract class Message implements Serializable {
         DELETE,
         UR_ELECTED,
         TIMEOUT,
-        NODE
+        NODE, 
+        DECISION_REQUEST, 
+        UNCERTAIN, 
+        IN_RECOVERY
     }
     Command command;
 

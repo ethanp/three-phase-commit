@@ -109,14 +109,6 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		peerQueueSockets[peerIndex].getConnectionToBID().sendMessage(new PeerTimeout(peerIndex + 2));
 		assertTrue(csm.receiveMessage(peerQueueSockets[peerIndex].getConnectionToAID()));
     }
-
-    private Message getLastMessageInQueue(Queue<Message> queue) {
-    	Message message;
-    	do {
-    		message = queue.poll();
-    	} while (queue.size() > 0);
-    	return message;    	
-    }
     
     private Message getLastMesageToTxnMgr() {
     	return getLastMessageInQueue(coordinatorToTxnMgr.getOutQueue());

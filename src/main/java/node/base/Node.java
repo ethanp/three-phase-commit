@@ -10,6 +10,7 @@ import messages.vote_req.VoteRequest;
 import node.CoordinatorStateMachine;
 import node.ElectionStateMachine;
 import node.LogRecoveryStateMachine;
+import node.ParticipantRecoveryStateMachine;
 import node.ParticipantStateMachine;
 import node.PeerReference;
 import system.network.Connection;
@@ -72,7 +73,7 @@ public abstract class Node {
     		stateMachine = new ParticipantStateMachine(this);
     	}
     	else {
-    		// start the recovery protocol
+    		stateMachine = new ParticipantRecoveryStateMachine(this, uncommitted, recoveryMachine.getLastUpSet());
     	}
     }
 
@@ -163,6 +164,10 @@ public abstract class Node {
 
     public void becomeCoordinator() {
         stateMachine = new CoordinatorStateMachine(this);
+    }
+    
+    public void becomeParticipant() {
+    	stateMachine = new ParticipantStateMachine(this);
     }
 
     public StateMachine getStateMachine() {
