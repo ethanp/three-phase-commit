@@ -66,7 +66,7 @@ public class ParticipantStateMachine extends StateMachine {
 
         synchronized (this) {
 
-            System.out.println("Participant "+node.getMyNodeID()+" received a "+msg.getCommand());
+            System.out.println("Participant "+node.getMyNodeID()+" received a "+msg.getCommand()+" from "+currentConnection.getReceiverID());
 
             /* if it's from the Coordinator, reset their timeout timer */
             switch (msg.getCommand()) {

@@ -48,13 +48,13 @@ public class ConsoleCommand {
         while (cmdSc.hasNext()) {
             switch (cmdSc.next()) {
                 case "-partialCommit":
-                    failureModes.add(new PartialBroadcast(Message.Command.COMMIT, Integer.parseInt(cmdSc.next())));
+                    failureModes.add(new PartialBroadcast(Message.Command.COMMIT, Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next())));
                     break;
                 case "-partialPrecommit":
-                    failureModes.add(new PartialBroadcast(Message.Command.PRE_COMMIT, Integer.parseInt(cmdSc.next())));
+                    failureModes.add(new PartialBroadcast(Message.Command.PRE_COMMIT, Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next())));
                     break;
                 case "-deathAfter":
-                    failureModes.add(new DeathAfter(Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next())));
+                    failureModes.add(new DeathAfter(Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next())));
                     break;
                 case "-delay":
                     delay = Integer.parseInt(cmdSc.next());

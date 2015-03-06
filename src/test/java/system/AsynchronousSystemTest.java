@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static messages.Message.Command.ABORT;
 import static messages.Message.Command.COMMIT;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertEquals;
@@ -123,19 +124,48 @@ public class AsynchronousSystemTest extends TestCommon {
 
     /* FAILURE CASES */
 
-    @Test
+    @Ignore
     public void testCoordinatorFailsBeforeSendingVoteReq() throws Exception {
-        String cmdStr = "add a_song a_url -deathAfter 1 1";
+
+    }
+
+    @Test
+    public void testParticipantFailsBeforeReceivingVoteReq() throws Exception {
+      /*
+            TxnMgr
+                creates nodes
+                dubs 1 coordinator
+
+            Coordinator
+                receives add request with 2's listen port
+                connects to node 2, and sends vital stats
+
+            Node 2
+                saves Coord's vital stats
+                listens for messages
+                CRASHES.
+
+            Coordinator
+                sends ADD to 2
+                times-out on 2
+                tells TxnMgr 2 is dead
+                ABORTS transaction
+
+            TxnMgr
+                receives "2 is dead" from Coord
+                restarts 2
+                receives ABORT, relays to System
+
+            Node 2
+                revives from it's log: nothing logged
+
+        */
+        String cmdStr = "add a_song a_url -deathAfter 1 1 2";
         ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
-        assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
+        assertEquals(ABORT, system.processCommandToCompletion(command).getCommand());
 
         Thread.sleep(Common.TIMEOUT_MILLISECONDS);
         system.killAllNodes();
-    }
-
-    @Ignore
-    public void testParticipantFailsBeforeReceivingVoteReq() throws Exception {
-
     }
 
     @Ignore

@@ -1,5 +1,6 @@
 package node.system;
 
+import messages.Message;
 import messages.NodeMessage;
 import node.PeerReference;
 import node.base.Node;
@@ -7,6 +8,7 @@ import system.network.Connection;
 import system.network.ObjectConnection;
 import util.Common;
 
+import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -60,6 +62,7 @@ public class AsyncProcessNode extends Node {
 
     @Override public void addConnection(Connection connection) {
         super.addConnection(connection);
+        L.OG("connected to "+connection.getReceiverID());
         new Thread(new ConnectionListener(this, (ObjectConnection)connection)).start();
     }
 
@@ -79,6 +82,7 @@ public class AsyncProcessNode extends Node {
                     new Socket(LOCALHOST, peerReference.getListeningPort()),
                     peerReference.getNodeID());
             addConnection(connection);
+            connection.sendMessage(new NodeMessage(getMyNodeID(), getListenPort()));
             return connection;
         }
         catch (IOException e) {
@@ -110,7 +114,21 @@ public class AsyncProcessNode extends Node {
             while (true) {
                 try {
                     Socket socket = serverSocket.accept();
-                    addConnection(new ObjectConnection(socket, Common.INVALID_ID));
+                    final ObjectConnection connection = new ObjectConnection(socket, Common.INVALID_ID);
+                    try {
+                        Message msg = connection.receiveMessage();
+                        if (msg instanceof NodeMessage) {
+                            connection.setReceiverID(((NodeMessage) msg).getNodeID());
+
+                        }
+                        else {
+                            L.OG("Conn didn't receive node msg");
+                        }
+                    }
+                    catch (EOFException e) {
+                        L.OG("New conn received EOF");
+                    }
+                    addConnection(connection);
                 }
                 catch (IOException e) {
                     e.printStackTrace();

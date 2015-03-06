@@ -5,6 +5,7 @@ import console.ConsoleCommand;
 import messages.DelayMessage;
 import messages.KillSig;
 import messages.Message;
+import messages.PeerTimeout;
 import node.system.AsyncLogger;
 import node.system.AsyncProcessNode;
 import system.failures.DeathAfter;
@@ -76,14 +77,14 @@ public class AsyncTxnMgr extends TransactionManager {
          */
         for (Message failure : command.getFailureModes()) {
             if (failure instanceof PartialBroadcast) {
-                sendCoordinator(failure);
+                send(((PartialBroadcast)failure).getWhichProc(), failure);
             }
             /**
              * NB: You can only send a node ONE DeathAfter for it to know until it fails.
              * This would be simple-ish to fix though.
              */
             else if (failure instanceof DeathAfter) {
-                int procID = ((DeathAfter)failure).getProcID();
+                int procID = ((DeathAfter)failure).getWhichProc();
                 send(procID, failure);
             }
         }
@@ -180,6 +181,29 @@ public class AsyncTxnMgr extends TransactionManager {
 
     public void receiveResponse(Message response) {
 
+        switch (response.getCommand()) {
+            case COMMIT:
+            case ABORT:
+                signalSystem(response);
+                break;
+
+            case TIMEOUT:
+                reviveNode((PeerTimeout)response);
+                break;
+
+        }
+    }
+
+    private void reviveNode(PeerTimeout response) {
+        int deadID = response.getPeerId();
+        nodes = getNodes().stream()
+                          .filter(r -> r.getNodeID() != deadID)
+                          .collect(Collectors.toList());
+        L.OG("Reviving node "+deadID);
+        nodes.add(createNode(deadID));
+    }
+
+    private void signalSystem(Message response) {
         /* tell the `AsynchronousSystem` the result */
         transactionLock.lock();
         setTransactionResult(response);

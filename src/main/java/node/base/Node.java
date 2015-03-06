@@ -51,7 +51,6 @@ public abstract class Node implements MessageReceiver {
     protected DeathAfter deathAfter = null;
 
     protected int msgsSent = 0;
-    protected int msgsRcvd = 0;
 
     public Node(int myNodeID) {
         this.myNodeID = myNodeID;
@@ -169,7 +168,7 @@ public abstract class Node implements MessageReceiver {
 
     @Override public boolean receiveMessageFrom(Connection connection, int msgsRcvd) {
         if (deathAfter != null
-            && deathAfter.getProcID() == connection.getReceiverID()
+            && deathAfter.getFromProc() == connection.getReceiverID()
             && deathAfter.getNumMsgs() >= msgsRcvd)
         {
             selfDestruct();
@@ -246,6 +245,7 @@ public abstract class Node implements MessageReceiver {
         }
         else if (msg instanceof DeathAfter) {
             deathAfter = (DeathAfter) msg;
+            System.out.println(getMyNodeID()+" will die after "+deathAfter.getNumMsgs()+" msgs from "+deathAfter.getFromProc());
         }
     }
 
