@@ -1,6 +1,7 @@
 package system;
 
 import console.CommandConsole;
+import console.ConsoleCommand;
 import messages.KillSig;
 import messages.Message;
 import node.system.AsyncLogger;
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.stream.Collectors;
 
 /**
  * Ethan Petuchowski 2/28/15
@@ -22,12 +24,12 @@ import java.util.concurrent.locks.ReentrantLock;
 public class AsyncTxnMgr extends TransactionManager {
     public AsyncTxnMgr(int numNodes) {
         super(numNodes);
-        console = new CommandConsole(this);
         waitForAllNodesToConnect();
         dubCoordinator(nodes.get(0).getNodeID());
         nodesConnected.lock();
         coordinatorChosen.signalAll();
         nodesConnected.unlock();
+        console = new CommandConsole(this);
     }
 
     private void waitForAllNodesToConnect() {
@@ -64,7 +66,8 @@ public class AsyncTxnMgr extends TransactionManager {
         return nodes.stream().filter(n -> n.getConn() != null).count();
     }
 
-    public void processCommand(CommandConsole.Command command) {
+    public void processCommand(ConsoleCommand command) {
+
         /**
          * Commands include
          *      1. Issuing a `VoteRequest`along with a `List<Failure>`
@@ -77,9 +80,20 @@ public class AsyncTxnMgr extends TransactionManager {
                 restartNode(nodeToKill);
                 break;
             default:
+                addPeerSet(command);
                 processRequest(command.getVoteRequest());
         }
 
+    }
+
+    /**
+     * add all the nodes the txn-mgr knows about to the peer-set attached to the vote-request
+     */
+    private void addPeerSet(ConsoleCommand command) {
+        command.getVoteRequest().setPeerSet(
+                getNodes().stream()
+                          .map(ManagerNodeRef::asPeerNode)
+                          .collect(Collectors.toList()));
     }
 
     private void restartNode(ManagerNodeRef nodeToKill) {

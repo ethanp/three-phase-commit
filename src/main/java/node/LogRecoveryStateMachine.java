@@ -12,31 +12,31 @@ import node.base.DTLog;
 import node.base.Node;
 
 public class LogRecoveryStateMachine {
-	
+
 	private VoteRequest currentRequest;
 	private Collection<PeerReference> lastUpSet;
 	private Node node;
 	private boolean votedYes;
-	
+
 	public LogRecoveryStateMachine(Node node) {
 		this.node = node;
 		for (Message message : node.getDtLog().getLoggedMessages()) {
-			handleLoggedMessage(message);
+            handleLoggedMessage(message);
 		}
 	}
-	
+
 	public VoteRequest getUncommittedRequest() {
 		return currentRequest;
 	}
-	
+
 	public Collection<PeerReference> getLastUpSet() {
 		return lastUpSet;
 	}
-	
+
 	public boolean didVoteYesOnRequest() {
 		return votedYes;
 	}
-	
+
 	private void handleLoggedMessage(Message message) {
 		switch (message.getCommand()) {
 		case ADD:
@@ -83,7 +83,7 @@ public class LogRecoveryStateMachine {
 		case UR_ELECTED:
 			break;
 		default:
-			break;		
+			break;
 		}
 	}
 }

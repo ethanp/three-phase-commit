@@ -13,4 +13,11 @@ public class DeathAfter extends Failure {
     final int numMsgs;
     final int procID;
 
+    public int getNumMsgs() {
+        return numMsgs;
+    }
+
+    public int getProcID() {
+        return procID;
+    }
 }

@@ -19,10 +19,8 @@ public class FileDTLog extends DTLog {
             if (!file.getParentFile().exists())
                 file.getParentFile().mkdirs();
 
-            if (file.exists())
-                file.delete();
-
-            file.createNewFile();
+            if (!file.exists())
+                file.createNewFile();
             writer = new FileWriter(file);
         }
         catch (IOException e) {

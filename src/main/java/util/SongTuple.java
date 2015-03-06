@@ -54,4 +54,12 @@ public class SongTuple implements Comparable<SongTuple>, Serializable {
     public static SongTuple readFromTokens(TokenReader reader) {
     	return new SongTuple(reader.readToken(), reader.readToken());
     }
+
+    public String getName() {
+        return name;
+    }
+
+    public String getUrl() {
+        return url;
+    }
 }

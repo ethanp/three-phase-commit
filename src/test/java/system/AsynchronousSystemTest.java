@@ -128,6 +128,8 @@ public class AsynchronousSystemTest extends TestCommon {
     public void testCoordinatorFailsBeforeSendingVoteReq() throws Exception {
         Failure f = new DeathAfter(TestCommon.TEST_COORD_ID, 0);
         VoteRequest addRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
+        String cmdStr = "add a_song a_url etc.";
+//        Message.Command command = new CommandConsole.Command(cmdStr, TXID);
         assertEquals(COMMIT, system.processRequestToCompletion(addRequest).getCommand());
     }
 
