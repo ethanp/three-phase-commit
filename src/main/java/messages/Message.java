@@ -19,9 +19,18 @@ public abstract class Message implements Serializable {
         return command;
     }
 
+    public static Command parseCommand(String word) {
+        for (Command command : Command.values()) {
+            if (word.equalsIgnoreCase(command.toString())) {
+                return command;
+            }
+        }
+        return Command.NONE;
+    }
+
     public enum Command {
+        NONE,
         DUB_COORDINATOR,
-        VOTE_REQ,
         PRE_COMMIT,
         COMMIT,
         ABORT,
@@ -33,9 +42,10 @@ public abstract class Message implements Serializable {
         DELETE,
         UR_ELECTED,
         TIMEOUT,
-        NODE, 
-        DECISION_REQUEST, 
-        UNCERTAIN, 
+        NODE,
+        DECISION_REQUEST,
+        UNCERTAIN,
+        KILL_SIG,
         IN_RECOVERY
     }
     Command command;

@@ -8,6 +8,8 @@ import messages.vote_req.VoteRequest;
 import node.PeerReference;
 import org.junit.Before;
 import org.junit.Test;
+import system.failures.DeathAfter;
+import system.failures.Failure;
 import util.Common;
 import util.TestCommon;
 
@@ -43,7 +45,7 @@ public class AsynchronousSystemTest extends TestCommon {
 
     @Before
     public void setUp() throws Exception {
-        system = new AsynchronousSystem(2);
+        system = new AsynchronousSystem(5);
         List<ManagerNodeRef> nodes = system.txnMgr.getNodes();
         peerReferences = nodes.stream()
                               .map(mgrNode -> mgrNode.asPeerNode())
@@ -58,6 +60,8 @@ public class AsynchronousSystemTest extends TestCommon {
     public void testAddRequest() throws Exception {
         VoteRequest addRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
         assertEquals(COMMIT, system.processRequestToCompletion(addRequest).getCommand());
+
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS);
         system.killAllNodes();
 
         String coordLog = coordLogString();
@@ -75,6 +79,8 @@ public class AsynchronousSystemTest extends TestCommon {
         assertEquals(COMMIT, system.processRequestToCompletion(add).getCommand());
         VoteRequest up = new UpdateRequest(A_SONG_NAME, SAME_SONG_NEW_URL, TXID+1, peerReferences);
         assertEquals(COMMIT, system.processRequestToCompletion(up).getCommand());
+
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS);
         system.killAllNodes();
 
         String coordLog = coordLogString();
@@ -97,6 +103,8 @@ public class AsynchronousSystemTest extends TestCommon {
         assertEquals(COMMIT, system.processRequestToCompletion(addRequest).getCommand());
         VoteRequest deleteRequest = new DeleteRequest(A_SONG_NAME, TXID+1, peerReferences);
         assertEquals(COMMIT, system.processRequestToCompletion(deleteRequest).getCommand());
+
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS);
         system.killAllNodes();
 
         String coordLog = coordLogString();
@@ -118,7 +126,9 @@ public class AsynchronousSystemTest extends TestCommon {
 
     @Ignore
     public void testCoordinatorFailsBeforeSendingVoteReq() throws Exception {
-
+        Failure f = new DeathAfter(TestCommon.TEST_COORD_ID, 0);
+        VoteRequest addRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
+        assertEquals(COMMIT, system.processRequestToCompletion(addRequest).getCommand());
     }
 
     @Ignore

@@ -1,16 +1,20 @@
 package console;
 
 import com.sun.istack.internal.NotNull;
+import messages.KillSig;
+import messages.Message;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
-import system.TransactionManager;
+import system.AsyncTxnMgr;
 import system.failures.DeathAfter;
 import system.failures.Failure;
-import system.failures.PartialCommit;
+import system.failures.PartialBroadcast;
 import util.SongTuple;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 
 /**
@@ -20,9 +24,9 @@ public class CommandConsole implements Runnable {
 
     Scanner sc = new Scanner(System.in);
     int transactionID = 0;
-    final TransactionManager transactionManager;
+    final AsyncTxnMgr transactionManager;
 
-    public CommandConsole(@NotNull TransactionManager mgr) {
+    public CommandConsole(@NotNull AsyncTxnMgr mgr) {
         transactionManager = mgr;
     }
 
@@ -30,13 +34,14 @@ public class CommandConsole implements Runnable {
         while (true) {
             String cmdStr = sc.nextLine();
             Command cmd = new Command(cmdStr, ++transactionID);
+            transactionManager.processCommand(cmd);
         }
     }
 
     public static class Command {
 
         VoteRequest voteRequest;
-        Failure failureMode;
+        List<Failure> failureMode = new ArrayList<>();
         int delay;
 
         Command(String cmdString, int txnID) {
@@ -53,22 +58,42 @@ public class CommandConsole implements Runnable {
                 case "delete":
                     voteRequest = new DeleteRequest(cmdSc.next(), txnID, null);
                     break;
+                case "kill":
+                    voteRequest = new KillSig(Integer.parseInt(cmdSc.next()));
+                    break;
                 default:
                     System.err.println("Unrecognized command");
             }
 
-            /* read failure case */
+            /* read failure case / option */
             while (cmdSc.hasNext()) {
                 switch (cmdSc.next()) {
                     case "-partialCommit":
-                        failureMode = new PartialCommit(Integer.parseInt(cmdSc.next()));
+                        failureMode.add(new PartialBroadcast(Message.Command.COMMIT, Integer.parseInt(cmdSc.next())));
+                        break;
+                    case "-partialPrecommit":
+                        failureMode.add(new PartialBroadcast(Message.Command.PRE_COMMIT, Integer.parseInt(cmdSc.next())));
+                        break;
+                    case "-deathAfter":
+                        failureMode.add(new DeathAfter(Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next())));
                         break;
                     case "-delay":
                         delay = Integer.parseInt(cmdSc.next());
                         break;
-                    case "-deathAfter":
-                        failureMode = new DeathAfter(Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next()));
-                        break;
+
+                    /* if there's time */
+//                    case "-participantFailure": // e.g. we can have it fail before PRE_COMMIT
+//                        failureMode = new NodeFailure(Role.PARTICIPANT, Message.parseCommand(cmdSc.next())));
+//                        break;
+//                    case "-futureCoordinatorFailure":
+//                        failureMode = new NodeFailure(Role.FUTURE_COORDINATOR, Message.parseCommand(cmdSc.next())));
+//                        break;
+//                    case "-cascadingCoordinatorFailure":
+//                        failureMode = new NodeFailure(Role.CASCADING_COORDINATOR, Message.parseCommand(cmdSc.next())));
+//                        break;
+//                    case "-totalFailure":
+//                        failureMode = new NodeFailure(Role.TOTAL, Message.parseCommand(cmdSc.next())));
+//                        break;
                 }
             }
         }
@@ -77,7 +102,7 @@ public class CommandConsole implements Runnable {
             return voteRequest;
         }
 
-        public Failure getFailureMode() {
+        public List<Failure> getFailureMode() {
             return failureMode;
         }
 
