@@ -2,6 +2,7 @@ package system.network;
 
 import messages.Message;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -25,9 +26,12 @@ public class ObjectConnection extends Connection {
         }
     }
 
-    @Override public Message receiveMessage() {
+    @Override public Message receiveMessage() throws EOFException {
         try {
             return (Message) in.readObject();
+        }
+        catch (EOFException e) {
+            throw e;
         }
         catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();

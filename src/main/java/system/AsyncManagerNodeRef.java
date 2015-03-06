@@ -9,4 +9,8 @@ public class AsyncManagerNodeRef extends ManagerNodeRef {
         super(id);
         process = p;
     }
+
+    @Override public void killNode() {
+        process.destroy();
+    }
 }

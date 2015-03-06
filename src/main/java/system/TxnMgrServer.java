@@ -8,6 +8,7 @@ import system.network.MessageReceiver;
 import system.network.ObjectConnection;
 import util.Common;
 
+import java.io.EOFException;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -51,7 +52,12 @@ public class TxnMgrServer implements Runnable, MessageReceiver {
     ObjectConnection addConnection(Socket socket) {
         ObjectConnection conn = new ObjectConnection(socket, -1);
 
-        NodeMessage n = (NodeMessage) conn.receiveMessage();
+        NodeMessage n = null;
+        try {
+            n = (NodeMessage) conn.receiveMessage();
+        }
+        catch (EOFException ignored) {}
+        assert n != null;
         int nodeID = n.getNodeID();
         int listenPort = n.getListenPort();
 
@@ -69,9 +75,12 @@ public class TxnMgrServer implements Runnable, MessageReceiver {
      * It should inform the User of the outcome of their submitted `VoteRequest`.
      */
     @Override public boolean receiveMessageFrom(Connection connection) {
-        final Message message = connection.receiveMessage();
-        System.out.println("mgr rcvd a "+message.getCommand());
-        txnMgr.receiveResponse(message);
+        try {
+            final Message message = connection.receiveMessage();
+            System.out.println("mgr rcvd a "+message.getCommand());
+            txnMgr.receiveResponse(message);
+        }
+        catch (EOFException ignore) {}
         return true;
     }
 }

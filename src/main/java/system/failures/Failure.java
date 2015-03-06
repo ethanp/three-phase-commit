@@ -5,7 +5,7 @@ package system.failures;
  */
 public abstract class Failure {
     public enum Case {
-        PARTIAL_COMMIT, DEATH_AFTER, NONE
+        PARTIAL_BROADCAST, DEATH_AFTER, NONE
     }
 
     Case aCase;

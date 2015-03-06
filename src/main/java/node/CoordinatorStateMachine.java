@@ -11,6 +11,7 @@ import node.base.StateMachine;
 import system.network.Connection;
 import util.Common;
 
+import java.io.EOFException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.stream.Collectors;
@@ -45,8 +46,13 @@ public class CoordinatorStateMachine extends StateMachine {
 	}
 
     @Override public boolean receiveMessage(Connection overConnection) {
-    	Message message = overConnection.receiveMessage();
-    	if (message == null) {
+
+        Message message;
+
+        try { message = overConnection.receiveMessage(); }
+        catch (EOFException e) { message = null; }
+
+        if (message == null) {
     		return false;
     	}
 

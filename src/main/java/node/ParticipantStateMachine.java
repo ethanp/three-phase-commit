@@ -17,6 +17,7 @@ import node.base.StateMachine;
 import system.network.Connection;
 import util.Common;
 
+import java.io.EOFException;
 import java.util.Collection;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
@@ -46,7 +47,10 @@ public class ParticipantStateMachine extends StateMachine {
     @Override public boolean receiveMessage(Connection overConnection) {
         currentConnection = overConnection;
 
-        Message msg = currentConnection.receiveMessage();
+        Message msg;
+
+        try { msg = currentConnection.receiveMessage(); }
+        catch (EOFException e) { msg = null; }
 
         if (msg == null) {
             return false;

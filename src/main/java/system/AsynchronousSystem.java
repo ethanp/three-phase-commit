@@ -2,6 +2,9 @@ package system;
 
 import messages.Message;
 import messages.vote_req.VoteRequest;
+import util.Common;
+
+import java.io.File;
 
 /**
  * Ethan Petuchowski 3/2/15
@@ -10,13 +13,27 @@ public class AsynchronousSystem extends DistributedSystem {
     final AsyncTxnMgr txnMgr;
 
     public AsynchronousSystem(int numNodes) {
+        clearLogs();
         this.txnMgr = new AsyncTxnMgr(numNodes);
+    }
+
+    private void clearLogs() {
+        File logDir = new File(Common.LOG_DIR);
+        if (logDir.exists()) {
+            if (logDir.isDirectory()) {
+                for (File logFile : logDir.listFiles()) {
+                    logFile.delete();
+                }
+            } else {
+                System.err.println("Log dir not directory");
+                System.exit(Common.EXIT_FAILURE);
+            }
+        }
     }
 
     @Override Message processRequestToCompletion(VoteRequest voteRequest) {
         txnMgr.processRequest(voteRequest);
         try {
-
             /**
              * Acquires the lock *unless* the current thread is `interrupted`.
              * Acquires the lock if it is available and returns immediately.
@@ -51,5 +68,13 @@ public class AsynchronousSystem extends DistributedSystem {
             txnMgr.transactionLock.unlock();
         }
         return txnMgr.getTransactionResult();
+    }
+
+    void killAllNodes() {
+        txnMgr.getNodes().stream().forEach(ManagerNodeRef::killNode);
+    }
+
+    void killNode(int nodeID) {
+        txnMgr.getNodeByID(nodeID).killNode();
     }
 }

@@ -39,7 +39,7 @@ public abstract class VoteRequest extends Message {
         }
         return sb.toString();
     }
-    
+
     protected void writePeerSetAsTokens(TokenWriter writer) {
     	writer.writeToken(new Integer(peerSet.size()).toString());
         for (PeerReference peer : peerSet) {
@@ -47,17 +47,21 @@ public abstract class VoteRequest extends Message {
             writer.writeToken(new Integer(peer.getListeningPort()).toString());
         }
     }
-    
+
     protected void readPeerSetAsTokens(TokenReader reader) {
     	int size = Integer.parseInt(reader.readToken());
     	ArrayList<PeerReference> peers = new ArrayList<PeerReference>();
     	for (int i = 0; i < size; ++i) {
     		PeerReference peer = new PeerReference(
-    				Integer.parseInt(reader.readToken()), 
+    				Integer.parseInt(reader.readToken()),
     				Integer.parseInt(reader.readToken()));
     		peers.add(peer);
     	}
     	peerSet = peers;
+    }
+
+    public void setPeerSet(Collection<PeerReference> peerSet) {
+        this.peerSet = peerSet;
     }
 
     protected abstract String actionLogString();

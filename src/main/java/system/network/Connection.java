@@ -2,6 +2,8 @@ package system.network;
 
 import messages.Message;
 
+import java.io.EOFException;
+
 /**
  * Ethan Petuchowski 2/28/15
  */
@@ -12,7 +14,7 @@ public abstract class Connection {
     }
 
     protected int receiverID;
-    public abstract Message receiveMessage();
+    public abstract Message receiveMessage() throws EOFException;
     public abstract void sendMessage(Message o);
 
     public int getReceiverID() {

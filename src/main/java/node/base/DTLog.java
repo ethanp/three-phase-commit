@@ -62,7 +62,8 @@ public abstract class DTLog {
     	String log = getLogAsString();
     	String[] logLines = log.split("\n");
     	for (String line : logLines) {
-    		String messageString = line.substring(line.lastIndexOf(']') + 2);
+            if (line.isEmpty()) continue;
+            String messageString = line.substring(line.lastIndexOf(']') + 2);
     		String[] messageTokens = messageString.split("  ");
 
     		TokenReader reader = new TokenReader() {
