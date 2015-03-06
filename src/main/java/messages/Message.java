@@ -15,6 +15,10 @@ public abstract class Message implements Serializable {
         this.transactionID = transactionID;
     }
 
+    public Message(Command command) {
+        this(command, -1);
+    }
+
     public Command getCommand() {
         return command;
     }
@@ -46,7 +50,9 @@ public abstract class Message implements Serializable {
         DECISION_REQUEST,
         UNCERTAIN,
         KILL_SIG,
-        IN_RECOVERY
+        IN_RECOVERY,
+        PARTIAL_BROADCAST,
+        DELAY, DEATH_AFTER
     }
     Command command;
 

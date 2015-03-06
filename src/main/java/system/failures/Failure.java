@@ -8,9 +8,13 @@ public abstract class Failure {
         PARTIAL_BROADCAST, DEATH_AFTER, NONE
     }
 
-    Case aCase;
+    Case theCase;
 
-    public Failure(Case aCase) {
-        this.aCase = aCase;
+    public Failure(Case theCase) {
+        this.theCase = theCase;
+    }
+
+    public Case getTheCase() {
+        return theCase;
     }
 }

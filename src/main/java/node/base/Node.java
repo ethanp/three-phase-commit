@@ -13,6 +13,8 @@ import node.LogRecoveryStateMachine;
 import node.ParticipantRecoveryStateMachine;
 import node.ParticipantStateMachine;
 import node.PeerReference;
+import system.failures.DeathAfter;
+import system.failures.PartialBroadcast;
 import system.network.Connection;
 import system.network.MessageReceiver;
 import system.network.QueueConnection;
@@ -44,6 +46,11 @@ public abstract class Node implements MessageReceiver {
 
     protected Connection txnMgrConn;
     protected Collection<Connection> peerConns = new ArrayList<>();
+
+    protected PartialBroadcast partialBroadcast = null;
+    protected DeathAfter deathAfter = null;
+
+    protected int msgsSent = 0;
 
     public Node(int myNodeID) {
         this.myNodeID = myNodeID;
@@ -159,7 +166,13 @@ public abstract class Node implements MessageReceiver {
         addSong(updatedSong);
     }
 
-    @Override public boolean receiveMessageFrom(Connection connection) {
+    @Override public boolean receiveMessageFrom(Connection connection, int msgsRcvd) {
+        if (deathAfter != null
+            && deathAfter.getFromProc() == connection.getReceiverID()
+            && deathAfter.getNumMsgs() >= msgsRcvd)
+        {
+            selfDestruct();
+        }
         return stateMachine.receiveMessage(connection);
     }
 
@@ -184,7 +197,12 @@ public abstract class Node implements MessageReceiver {
     }
 
     public void sendTxnMgrMsg(Message message) {
-        txnMgrConn.sendMessage(message);
+        send(txnMgrConn, message);
+    }
+
+    public void send(Connection conn, Message message) {
+        msgsSent++;
+        conn.sendMessage(message);
     }
 
     /**
@@ -220,6 +238,34 @@ public abstract class Node implements MessageReceiver {
     public void startElectionProtocol() {
         stateMachine = new ElectionStateMachine();
     }
+
+    public void addFailure(Message msg) {
+        if (msg instanceof PartialBroadcast) {
+            partialBroadcast = (PartialBroadcast) msg;
+        }
+        else if (msg instanceof DeathAfter) {
+            deathAfter = (DeathAfter) msg;
+            System.out.println(getMyNodeID()+" will die after "+deathAfter.getNumMsgs()+" msgs from "+deathAfter.getFromProc());
+        }
+    }
+
+    public void broadcast(Collection<Connection> recipients, Message request) {
+        int i = 0, numBeforeCrash = 1000;
+        if (partialBroadcast != null && partialBroadcast.getStage().equals(request.getCommand())) {
+            numBeforeCrash = partialBroadcast.getCountProcs();
+        }
+        for (Connection connection : recipients) {
+            if (i++ < numBeforeCrash) {
+                send(connection, request);
+            }
+            else {
+                selfDestruct();
+            }
+		}
+		sendTxnMgrMsg(request);
+    }
+
+    protected abstract void selfDestruct();
 
     private class TimeoutMonitor {
 
@@ -276,7 +322,8 @@ public abstract class Node implements MessageReceiver {
                             new QueueConnection(
                                     TIMEOUT_MONITOR_ID,
                                     new LinkedList<>(Arrays.asList(new PeerTimeout(peerID))),
-                                    new LinkedList<>()));
+                                    new LinkedList<>()),
+                            0);
                 }
                 catch (InterruptedException e) {
                     /* this means a Timeout did NOT occur */

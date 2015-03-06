@@ -1,6 +1,7 @@
 package system;
 
 import messages.DubCoordinatorMessage;
+import messages.Message;
 import messages.vote_req.VoteRequest;
 import node.PeerReference;
 import system.network.Network;
@@ -42,8 +43,20 @@ public abstract class TransactionManager {
         return nodes;
     }
 
+    public void broadcast(Message message) {
+        getNodes().forEach(n -> n.sendMessage(message));
+    }
+
     public void processRequest(VoteRequest voteRequest) {
         coordinator.sendMessage(voteRequest);
+    }
+
+    public void sendCoordinator(Message message) {
+        coordinator.sendMessage(message);
+    }
+
+    public void send(int nodeID, Message message) {
+        getNodeByID(nodeID).sendMessage(message);
     }
 
     public void dubCoordinator(int nodeID) {

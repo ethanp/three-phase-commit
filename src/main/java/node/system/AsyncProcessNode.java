@@ -1,5 +1,6 @@
 package node.system;
 
+import messages.Message;
 import messages.NodeMessage;
 import node.PeerReference;
 import node.base.Node;
@@ -7,6 +8,7 @@ import system.network.Connection;
 import system.network.ObjectConnection;
 import util.Common;
 
+import java.io.EOFException;
 import java.io.File;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -44,6 +46,7 @@ public class AsyncProcessNode extends Node {
             L.OG("connected to System");
 
             /* tell the System my logical ID and listen port */
+            // (doesn't increment sent-msgs count)
             txnMgrConn.sendMessage(new NodeMessage(getMyNodeID(), getListenPort()));
             new Thread(new ConnectionListener(this, (ObjectConnection)txnMgrConn)).start();
         }
@@ -59,6 +62,7 @@ public class AsyncProcessNode extends Node {
 
     @Override public void addConnection(Connection connection) {
         super.addConnection(connection);
+        L.OG("connected to "+connection.getReceiverID());
         new Thread(new ConnectionListener(this, (ObjectConnection)connection)).start();
     }
 
@@ -78,6 +82,7 @@ public class AsyncProcessNode extends Node {
                     new Socket(LOCALHOST, peerReference.getListeningPort()),
                     peerReference.getNodeID());
             addConnection(connection);
+            connection.sendMessage(new NodeMessage(getMyNodeID(), getListenPort()));
             return connection;
         }
         catch (IOException e) {
@@ -86,6 +91,11 @@ public class AsyncProcessNode extends Node {
             e.printStackTrace();
             return null;
         }
+    }
+
+    @Override protected void selfDestruct() {
+        System.err.println("Node "+getMyNodeID()+" self destructing!");
+        System.exit(Common.EXIT_SUCCESS);
     }
 
     class NodeServer implements Runnable {
@@ -104,7 +114,21 @@ public class AsyncProcessNode extends Node {
             while (true) {
                 try {
                     Socket socket = serverSocket.accept();
-                    addConnection(new ObjectConnection(socket, Common.INVALID_ID));
+                    final ObjectConnection connection = new ObjectConnection(socket, Common.INVALID_ID);
+                    try {
+                        Message msg = connection.receiveMessage();
+                        if (msg instanceof NodeMessage) {
+                            connection.setReceiverID(((NodeMessage) msg).getNodeID());
+
+                        }
+                        else {
+                            L.OG("Conn didn't receive node msg");
+                        }
+                    }
+                    catch (EOFException e) {
+                        L.OG("New conn received EOF");
+                    }
+                    addConnection(connection);
                 }
                 catch (IOException e) {
                     e.printStackTrace();
@@ -114,8 +138,8 @@ public class AsyncProcessNode extends Node {
     }
 
     public static void main(String[] args) throws IOException {
-        int systemListenPort = args.length > 0 ? Integer.parseInt(args[0]) : 3000;
-        int nodeID = args.length > 1 ? Integer.parseInt(args[1]) : 55;
+        int nodeID = args.length > 0 ? Integer.parseInt(args[0]) : 55;
+        int systemListenPort = args.length > 1 ? Integer.parseInt(args[1]) : 3000;
         System.out.println("Node "+nodeID+" booting in its own process");
         AsyncProcessNode node = new AsyncProcessNode(systemListenPort, nodeID);
     }

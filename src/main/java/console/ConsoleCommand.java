@@ -7,7 +7,6 @@ import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import system.failures.DeathAfter;
-import system.failures.Failure;
 import system.failures.PartialBroadcast;
 import util.SongTuple;
 
@@ -21,8 +20,8 @@ import java.util.Scanner;
 public class ConsoleCommand {
 
     VoteRequest voteRequest;
-    List<Failure> failureModes = new ArrayList<>();
-    int delay;
+    List<Message> failureModes = new ArrayList<>();
+    int delay = -1;
 
     public ConsoleCommand(String cmdString, int txnID) {
         Scanner cmdSc = new Scanner(cmdString);
@@ -40,7 +39,7 @@ public class ConsoleCommand {
                 break;
             case "kill":
                 voteRequest = new KillSig(Integer.parseInt(cmdSc.next()));
-                break;
+                return;
             default:
                 System.err.println("Unrecognized command");
         }
@@ -49,13 +48,13 @@ public class ConsoleCommand {
         while (cmdSc.hasNext()) {
             switch (cmdSc.next()) {
                 case "-partialCommit":
-                    failureModes.add(new PartialBroadcast(Message.Command.COMMIT, Integer.parseInt(cmdSc.next())));
+                    failureModes.add(new PartialBroadcast(Message.Command.COMMIT, Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next())));
                     break;
                 case "-partialPrecommit":
-                    failureModes.add(new PartialBroadcast(Message.Command.PRE_COMMIT, Integer.parseInt(cmdSc.next())));
+                    failureModes.add(new PartialBroadcast(Message.Command.PRE_COMMIT, Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next())));
                     break;
                 case "-deathAfter":
-                    failureModes.add(new DeathAfter(Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next())));
+                    failureModes.add(new DeathAfter(Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next())));
                     break;
                 case "-delay":
                     delay = Integer.parseInt(cmdSc.next());
@@ -87,7 +86,7 @@ public class ConsoleCommand {
         return voteRequest;
     }
 
-    public List<Failure> getFailureModes() {
+    public List<Message> getFailureModes() {
         return failureModes;
     }
 

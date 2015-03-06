@@ -1,12 +1,14 @@
 package node;
 
 import messages.DecisionRequest;
+import messages.DelayMessage;
 import messages.InRecoveryResponse;
 import messages.Message;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
 import system.network.Connection;
+import util.Common;
 
 import java.io.EOFException;
 import java.util.ArrayList;
@@ -66,7 +68,10 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
             message = overConnection.receiveMessage();
         }
 
-        catch (EOFException e) { message = null; }
+        catch (EOFException e) {
+            System.err.println("Node "+ownerNode.getMyNodeID()+" received EOFException");
+            message = null;
+        }
 
         if (message == null)
 		{
@@ -129,8 +134,20 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 			}
 			break;
 		case DECISION_REQUEST:
-			overConnection.sendMessage(new InRecoveryResponse(uncommitted.getTransactionID(), originalUpSet));
+            ownerNode.send(overConnection, new InRecoveryResponse(uncommitted.getTransactionID(), originalUpSet));
 			break;
+
+        /* Fail Cases */
+        case PARTIAL_BROADCAST:
+            ownerNode.addFailure(message);
+            break;
+        case DEATH_AFTER:
+            ownerNode.addFailure(message);
+            break;
+
+        case DELAY:
+            Common.MESSAGE_DELAY = ((DelayMessage) message).getDelaySec()*1000;
+
 		default:
 			return false;
 		}
@@ -153,7 +170,7 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
         Connection currentPeerConnection = ownerNode.isConnectedTo(current)
                 ? ownerNode.getPeerConnForId(current.nodeID)
                 : ownerNode.connectTo(current);
-        currentPeerConnection.sendMessage(new DecisionRequest(uncommitted.getTransactionID()));
+        ownerNode.send(currentPeerConnection, new DecisionRequest(uncommitted.getTransactionID()));
 	}
 
 	private void advanceToNextProcessOrRewind() {

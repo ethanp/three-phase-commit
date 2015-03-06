@@ -2,6 +2,7 @@ package node;
 
 import messages.AbortRequest;
 import messages.CommitRequest;
+import messages.DelayMessage;
 import messages.Message;
 import messages.PeerTimeout;
 import messages.PrecommitRequest;
@@ -74,17 +75,20 @@ public class CoordinatorStateMachine extends StateMachine {
                     else
                         throw new RuntimeException("Received command when not waiting for one");
                 case YES:
+                    ownerNode.cancelTimersFor(overConnection.getReceiverID());
                     if (state == CoordinatorState.WaitingForVotes) {
                         ++yesVotes;
                         checkForEnoughYesVotes();
                     }
                     break;
                 case NO:
+                    ownerNode.cancelTimersFor(overConnection.getReceiverID());
                     if (state == CoordinatorState.WaitingForVotes) {
                         abortCurrentTransaction();
                     }
                     break;
                 case ACK:
+                    ownerNode.cancelTimersFor(overConnection.getReceiverID());
                     if (state == CoordinatorState.WaitingForAcks) {
                         ++acks;
                         checkForEnoughAcks();
@@ -94,12 +98,28 @@ public class CoordinatorStateMachine extends StateMachine {
                     break;
                 case TIMEOUT:
                     int peerID = ((PeerTimeout) message).getPeerId();
+                    ownerNode.cancelTimersFor(peerID);
                     PeerReference ref = getPeerSet().stream()
                                                     .filter(pr -> pr.nodeID == peerID)
                                                     .findFirst()
                                                     .get();
                     onTimeout(ref);
                     break;
+
+                // TODO decision request
+                case DECISION_REQUEST:
+                    break;
+
+                /* fail cases */
+                case PARTIAL_BROADCAST:
+                case DEATH_AFTER:
+                    ownerNode.addFailure(message);
+                    break;
+
+                case DELAY:
+                    Common.MESSAGE_DELAY = ((DelayMessage) message).getDelaySec()*1000;
+                    break;
+
                 default:
                     throw new RuntimeException("invalid message for coordinator");
             }
@@ -108,6 +128,10 @@ public class CoordinatorStateMachine extends StateMachine {
     }
 
     private void onTimeout(PeerReference peerReference) {
+
+        /* inform mgr of timeout */
+        ownerNode.sendTxnMgrMsg(new PeerTimeout(peerReference.getNodeID()));
+
     	// if we're waiting for a command, a timeout doesn't matter.
     	if (state == CoordinatorState.WaitingForVotes) {
     		getPeerSet().remove(peerReference);
@@ -148,7 +172,10 @@ public class CoordinatorStateMachine extends StateMachine {
 	                              : ownerNode.connectTo(reference);
 
 	            conns.add(conn);
-	            conn.sendMessage(message);
+                ownerNode.send(conn, message);
+
+                /* start timers on everyone */
+                ownerNode.resetTimersFor(reference.getNodeID());
 	        }
 	        setPeerSet(peerSet);
 	        txnConnections = conns;
@@ -172,10 +199,7 @@ public class CoordinatorStateMachine extends StateMachine {
     private void abortCurrentTransaction() {
 		AbortRequest abort = new AbortRequest(ongoingTransactionID);
 		ownerNode.logMessage(abort);
-		for (Connection connection : txnConnections) {
-			connection.sendMessage(abort);
-		}
-		ownerNode.sendTxnMgrMsg(abort);
+        ownerNode.broadcast(txnConnections, abort);
 		resetToWaiting();
     }
 
@@ -184,7 +208,8 @@ public class CoordinatorStateMachine extends StateMachine {
     	if (yesVotes >= peerSet.size()) {
     		PrecommitRequest precommit = new PrecommitRequest(ongoingTransactionID);
     		for (Connection connection : txnConnections) {
-    			connection.sendMessage(precommit);
+                ownerNode.resetTimersFor(connection.getReceiverID());
+                ownerNode.send(connection, precommit);
     		}
     		state = CoordinatorState.WaitingForAcks;
     	}
@@ -196,7 +221,7 @@ public class CoordinatorStateMachine extends StateMachine {
 			CommitRequest commit = new CommitRequest(ongoingTransactionID);
 			ownerNode.logMessage(commit);
             for (Connection connection : txnConnections) {
-				connection.sendMessage(commit);
+                ownerNode.send(connection, commit);
 			}
             ownerNode.sendTxnMgrMsg(commit);
             ownerNode.commitAction(action);

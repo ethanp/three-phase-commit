@@ -2,11 +2,14 @@ package system;
 
 import console.CommandConsole;
 import console.ConsoleCommand;
+import messages.DelayMessage;
 import messages.KillSig;
 import messages.Message;
+import messages.PeerTimeout;
 import node.system.AsyncLogger;
 import node.system.AsyncProcessNode;
-import system.failures.Failure;
+import system.failures.DeathAfter;
+import system.failures.PartialBroadcast;
 import util.Common;
 
 import java.io.IOException;
@@ -58,7 +61,6 @@ public class AsyncTxnMgr extends TransactionManager {
     protected TxnMgrServer mgrServer;
     protected AsyncLogger L;
 
-    protected List<Failure> failures = new ArrayList<>();
     protected CommandConsole console;
 
 
@@ -67,6 +69,29 @@ public class AsyncTxnMgr extends TransactionManager {
     }
 
     public void processCommand(ConsoleCommand command) {
+
+        /**
+         * Actually INSTEAD of passing the failures to the node as a commandline param
+         * we should send it to the node as a message
+         * so that we don't have to kill and restart them.
+         */
+        for (Message failure : command.getFailureModes()) {
+            if (failure instanceof PartialBroadcast) {
+                send(((PartialBroadcast)failure).getWhichProc(), failure);
+            }
+            /**
+             * NB: You can only send a node ONE DeathAfter for it to know until it fails.
+             * This would be simple-ish to fix though.
+             */
+            else if (failure instanceof DeathAfter) {
+                int procID = ((DeathAfter)failure).getWhichProc();
+                send(procID, failure);
+            }
+        }
+
+        if (command.getDelay() > -1) {
+            broadcast(new DelayMessage(command.getDelay()));
+        }
 
         /**
          * Commands include
@@ -102,9 +127,11 @@ public class AsyncTxnMgr extends TransactionManager {
     }
 
     public ManagerNodeRef createNode(int nodeID) {
+
         final List<String> commandLine = Arrays.asList(
                 "java", "-cp", "target/classes", AsyncProcessNode.class.getCanonicalName(),
-                String.valueOf(mgrServer.getListenPort()), "fakeID");
+                String.valueOf(nodeID),
+                String.valueOf(mgrServer.getListenPort()));
 
         /* The start() method creates a new Process instance with those attributes.
            The start() method can be invoked repeatedly from the same instance to
@@ -122,8 +149,6 @@ public class AsyncTxnMgr extends TransactionManager {
         //noinspection ConstantConditions
         while (p == null && retries++ < 3) {
             try {
-                int lastIdx = procBldr.command().size() - 1;
-                procBldr.command().set(lastIdx, String.valueOf(nodeID));
                 p = procBldr.start();
                 return new AsyncManagerNodeRef(nodeID, p);
             }
@@ -156,6 +181,29 @@ public class AsyncTxnMgr extends TransactionManager {
 
     public void receiveResponse(Message response) {
 
+        switch (response.getCommand()) {
+            case COMMIT:
+            case ABORT:
+                signalSystem(response);
+                break;
+
+            case TIMEOUT:
+                reviveNode((PeerTimeout)response);
+                break;
+
+        }
+    }
+
+    private void reviveNode(PeerTimeout response) {
+        int deadID = response.getPeerId();
+        nodes = getNodes().stream()
+                          .filter(r -> r.getNodeID() != deadID)
+                          .collect(Collectors.toList());
+        L.OG("Reviving node "+deadID);
+        nodes.add(createNode(deadID));
+    }
+
+    private void signalSystem(Message response) {
         /* tell the `AsynchronousSystem` the result */
         transactionLock.lock();
         setTransactionResult(response);

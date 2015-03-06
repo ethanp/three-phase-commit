@@ -2,7 +2,6 @@ package system;
 
 import messages.Message;
 import node.PeerReference;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.network.Connection;
 
 import java.io.EOFException;
@@ -40,14 +39,17 @@ public class ManagerNodeRef {
     }
 
     public void killNode() {
-        throw new NotImplementedException();
+        throw new RuntimeException("You can only kill an AsyncManagerNodeRef!");
     }
 
     public Message receiveMessage() {
         try {
             return getConn().receiveMessage();
         }
-        catch (EOFException ignored) {return null;}
+        catch (EOFException ignored) {
+            System.err.println("NodeRef "+getNodeID()+" received EOFException");
+            return null;
+        }
     }
 
     public PeerReference asPeerNode() {
