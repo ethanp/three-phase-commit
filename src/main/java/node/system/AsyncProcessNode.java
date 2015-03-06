@@ -44,6 +44,7 @@ public class AsyncProcessNode extends Node {
             L.OG("connected to System");
 
             /* tell the System my logical ID and listen port */
+            // (doesn't increment sent-msgs count)
             txnMgrConn.sendMessage(new NodeMessage(getMyNodeID(), getListenPort()));
             new Thread(new ConnectionListener(this, (ObjectConnection)txnMgrConn)).start();
         }
@@ -86,6 +87,11 @@ public class AsyncProcessNode extends Node {
             e.printStackTrace();
             return null;
         }
+    }
+
+    @Override protected void selfDestruct() {
+        System.err.println("Node "+getMyNodeID()+" self destructing!");
+        System.exit(Common.EXIT_SUCCESS);
     }
 
     class NodeServer implements Runnable {

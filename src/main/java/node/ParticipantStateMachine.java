@@ -3,6 +3,7 @@ package node;
 import messages.AbortRequest;
 import messages.AckRequest;
 import messages.CommitRequest;
+import messages.DelayMessage;
 import messages.Message;
 import messages.NoResponse;
 import messages.PeerTimeout;
@@ -14,6 +15,7 @@ import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.network.Connection;
 import util.Common;
 
@@ -50,7 +52,10 @@ public class ParticipantStateMachine extends StateMachine {
         Message msg;
 
         try { msg = currentConnection.receiveMessage(); }
-        catch (EOFException e) { msg = null; }
+        catch (EOFException e) {
+            System.err.println("Node "+node.getMyNodeID()+" received EOFException");
+            msg = null;
+        }
 
         if (msg == null) {
             return false;
@@ -77,7 +82,7 @@ public class ParticipantStateMachine extends StateMachine {
 
             switch (msg.getCommand()) {
 
-            /* VOTE REQUESTS */
+                /* VOTE REQUESTS */
                 case ADD:
                 case UPDATE:
                 case DELETE:
@@ -85,11 +90,7 @@ public class ParticipantStateMachine extends StateMachine {
                      receiveVoteRequest(vote, node.getVoteValue(vote));
                      break;
 
-
-            /* OTHER */
-                case DUB_COORDINATOR:
-                    receiveDubCoordinator(msg);
-                    break;
+                /* PROTOCOL STAGES */
                 case PRE_COMMIT:
                     receivePrecommit((PrecommitRequest) msg);
                     break;
@@ -99,12 +100,37 @@ public class ParticipantStateMachine extends StateMachine {
                 case ABORT:
                     receiveAbort(msg);
                     break;
+
+                /* BECOME COORDINATOR */
                 case UR_ELECTED:
                     receiveUR_ELECTED(msg);
                     break;
+                case NONE:
+                    break;
+                case DUB_COORDINATOR:
+                    receiveDubCoordinator(msg);
+                    break;
+
+                /* UH-OH */
                 case TIMEOUT:
                     onTimeout((PeerTimeout) msg);
                     break;
+
+                // TODO Decision-Request
+                case DECISION_REQUEST:
+                    throw new NotImplementedException();
+
+                /* SET FAIL-CASE OR DELAY */
+                case PARTIAL_BROADCAST:
+                case DEATH_AFTER:
+                    node.addFailure(msg);
+                    break;
+
+                /* SET INTERACTIVE DELAY */
+                case DELAY:
+                    Common.MESSAGE_DELAY = ((DelayMessage) msg).getDelaySec()*1000;
+                    break;
+
                 default:
                     throw new RuntimeException("Not a valid message: "+msg.getCommand());
             }
@@ -160,8 +186,7 @@ public class ParticipantStateMachine extends StateMachine {
      */
     private void receivePrecommit(PrecommitRequest precommitRequest) {
         setPrecommitted(true);
-        currentConnection.sendMessage(
-                new AckRequest(getOngoingTransactionID()));
+        node.send(currentConnection, new AckRequest(getOngoingTransactionID()));
     }
 
     private void receiveCommit(CommitRequest commitRequest) {
@@ -173,7 +198,7 @@ public class ParticipantStateMachine extends StateMachine {
     public void respondNOToVoteRequest(Message message) {
         setOngoingTransactionID(NO_ONGOING_TRANSACTION);
         node.logMessage(new AbortRequest(message.getTransactionID()));
-        currentConnection.sendMessage(new NoResponse(message));
+        node.send(currentConnection, new NoResponse(message));
     }
 
     private void respondYESToVoteRequest(VoteRequest voteRequest) {
@@ -186,7 +211,7 @@ public class ParticipantStateMachine extends StateMachine {
 
     public void logAndSendMessage(Message message) {
         node.logMessage(message);
-        currentConnection.sendMessage(message);
+        node.send(currentConnection, message);
     }
 
     /* Getters and Setters */

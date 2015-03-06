@@ -9,6 +9,7 @@ import system.network.ObjectConnection;
 public class ConnectionListener implements Runnable {
     private MessageReceiver receiver;
     ObjectConnection connection;
+    int msgsRcvd = 0;
     public ConnectionListener(MessageReceiver receiver, ObjectConnection connection) {
         this.receiver = receiver;
         this.connection = connection;
@@ -16,7 +17,7 @@ public class ConnectionListener implements Runnable {
 
     @Override public void run() {
         while (true) {
-            receiver.receiveMessageFrom(connection);
+            receiver.receiveMessageFrom(connection, msgsRcvd++);
         }
     }
 }

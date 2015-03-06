@@ -14,6 +14,10 @@ public class DelayMessage extends Message {
         this.delaySec = delaySeconds;
     }
 
+    public int getDelaySec() {
+        return delaySec;
+    }
+
     @Override protected void writeAsTokens(TokenWriter writer) {
         throw new NotImplementedException();
     }

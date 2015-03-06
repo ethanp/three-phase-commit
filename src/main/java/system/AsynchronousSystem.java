@@ -1,5 +1,6 @@
 package system;
 
+import console.ConsoleCommand;
 import messages.Message;
 import messages.vote_req.VoteRequest;
 import util.Common;
@@ -31,8 +32,17 @@ public class AsynchronousSystem extends DistributedSystem {
         }
     }
 
+    public Message processCommandToCompletion(ConsoleCommand command) {
+        txnMgr.processCommand(command);
+        return waitForResponse();
+    }
+
     @Override Message processRequestToCompletion(VoteRequest voteRequest) {
         txnMgr.processRequest(voteRequest);
+        return waitForResponse();
+    }
+
+    private Message waitForResponse() {
         try {
             /**
              * Acquires the lock *unless* the current thread is `interrupted`.

@@ -10,13 +10,13 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
  */
 public class PartialBroadcast extends Message {
 
-    final int lastProcID;
+    final int countProcs;
     final Command stage;
 
-    public PartialBroadcast(Command stage, int lastProcID) {
+    public PartialBroadcast(Command stage, int countProcs) {
         super(Command.PARTIAL_BROADCAST);
         this.stage = stage;
-        this.lastProcID = lastProcID;
+        this.countProcs = countProcs;
     }
 
     @Override protected void writeAsTokens(TokenWriter writer) {
@@ -31,7 +31,7 @@ public class PartialBroadcast extends Message {
         return stage;
     }
 
-    public int getLastProcID() {
-        return lastProcID;
+    public int getCountProcs() {
+        return countProcs;
     }
 }

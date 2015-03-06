@@ -56,7 +56,9 @@ public class TxnMgrServer implements Runnable, MessageReceiver {
         try {
             n = (NodeMessage) conn.receiveMessage();
         }
-        catch (EOFException ignored) {}
+        catch (EOFException ignored) {
+//            System.err.println("TxnMgr received EOFException from "+conn.getReceiverID());
+        }
         assert n != null;
         int nodeID = n.getNodeID();
         int listenPort = n.getListenPort();
@@ -74,13 +76,15 @@ public class TxnMgrServer implements Runnable, MessageReceiver {
      * `Message` is received over the associated `Connection`.
      * It should inform the User of the outcome of their submitted `VoteRequest`.
      */
-    @Override public boolean receiveMessageFrom(Connection connection) {
+    @Override public boolean receiveMessageFrom(Connection connection, int msgsRcvd) {
         try {
             final Message message = connection.receiveMessage();
-            System.out.println("mgr rcvd a "+message.getCommand());
+            System.out.println("mgr rcvd a "+message.getCommand()+" from node "+connection.getReceiverID());
             txnMgr.receiveResponse(message);
         }
-        catch (EOFException ignore) {}
+        catch (EOFException ignore) {
+//            System.err.println("TxnMgr received EOFException from "+connection.getReceiverID());
+        }
         return true;
     }
 }

@@ -15,6 +15,7 @@ public class Common {
     public static final int INVALID_ID = -1;
     public static final int TIMEOUT_MONITOR_ID = -2;
     public static final int TIMEOUT_MILLISECONDS = 1000;
+    public static final int EXIT_SUCCESS = 0;
     static int reqPort = 3000;
     public static final int TXN_MGR_ID = 0;
     public static long MESSAGE_DELAY = 0;

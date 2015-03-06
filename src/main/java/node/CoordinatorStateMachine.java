@@ -2,6 +2,7 @@ package node;
 
 import messages.AbortRequest;
 import messages.CommitRequest;
+import messages.DelayMessage;
 import messages.Message;
 import messages.PeerTimeout;
 import messages.PrecommitRequest;
@@ -100,6 +101,21 @@ public class CoordinatorStateMachine extends StateMachine {
                                                     .get();
                     onTimeout(ref);
                     break;
+
+                // TODO decision request
+                case DECISION_REQUEST:
+                    break;
+
+                /* fail cases */
+                case PARTIAL_BROADCAST:
+                case DEATH_AFTER:
+                    ownerNode.addFailure(message);
+                    break;
+
+                case DELAY:
+                    Common.MESSAGE_DELAY = ((DelayMessage) message).getDelaySec()*1000;
+                    break;
+
                 default:
                     throw new RuntimeException("invalid message for coordinator");
             }
@@ -148,7 +164,7 @@ public class CoordinatorStateMachine extends StateMachine {
 	                              : ownerNode.connectTo(reference);
 
 	            conns.add(conn);
-	            conn.sendMessage(message);
+                ownerNode.send(conn, message);
 	        }
 	        setPeerSet(peerSet);
 	        txnConnections = conns;
@@ -172,10 +188,7 @@ public class CoordinatorStateMachine extends StateMachine {
     private void abortCurrentTransaction() {
 		AbortRequest abort = new AbortRequest(ongoingTransactionID);
 		ownerNode.logMessage(abort);
-		for (Connection connection : txnConnections) {
-			connection.sendMessage(abort);
-		}
-		ownerNode.sendTxnMgrMsg(abort);
+        ownerNode.broadcast(txnConnections, abort);
 		resetToWaiting();
     }
 
@@ -184,7 +197,7 @@ public class CoordinatorStateMachine extends StateMachine {
     	if (yesVotes >= peerSet.size()) {
     		PrecommitRequest precommit = new PrecommitRequest(ongoingTransactionID);
     		for (Connection connection : txnConnections) {
-    			connection.sendMessage(precommit);
+                ownerNode.send(connection, precommit);
     		}
     		state = CoordinatorState.WaitingForAcks;
     	}
@@ -196,7 +209,7 @@ public class CoordinatorStateMachine extends StateMachine {
 			CommitRequest commit = new CommitRequest(ongoingTransactionID);
 			ownerNode.logMessage(commit);
             for (Connection connection : txnConnections) {
-				connection.sendMessage(commit);
+                ownerNode.send(connection, commit);
 			}
             ownerNode.sendTxnMgrMsg(commit);
             ownerNode.commitAction(action);

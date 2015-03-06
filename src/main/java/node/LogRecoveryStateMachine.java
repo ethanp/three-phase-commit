@@ -1,16 +1,16 @@
 package node;
 
-import java.util.Collection;
-
 import messages.Message;
 import messages.PeerTimeout;
-import messages.vote_req.AddRequest;
-import messages.vote_req.DeleteRequest;
-import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
-import node.base.DTLog;
 import node.base.Node;
 
+import java.util.Collection;
+
+/**
+ * Updates node's playlist, currentRequest, and upset to match its log.
+ * Does not `receive` any Messages from any Connections.
+ */
 public class LogRecoveryStateMachine {
 
 	private VoteRequest currentRequest;

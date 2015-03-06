@@ -14,6 +14,8 @@ import system.network.QueueSocket;
  */
 public class SyncNode extends Node {
 
+    int ticks = 0;
+
     public SyncNode(int myNodeID, QueueConnection toTxnManager) {
         this(myNodeID, toTxnManager, null);
     }
@@ -34,12 +36,13 @@ public class SyncNode extends Node {
      */
     public boolean tick() {
 
-        if (receiveMessageFrom(txnMgrConn)) {
+        ticks++;
+        if (receiveMessageFrom(txnMgrConn, ticks)) {
             return false;
         }
 
         for (Connection connection : peerConns) {
-            if (receiveMessageFrom(connection)) {
+            if (receiveMessageFrom(connection, ticks)) {
                 return false;
             }
         }
@@ -70,5 +73,9 @@ public class SyncNode extends Node {
         this.addConnection(connectionToPeer);
         toConnectTo.addConnection(qs.getConnectionToAID());
         return connectionToPeer;
+    }
+
+    @Override protected void selfDestruct() {
+        System.err.println("This is where I WOULD self-destruct.");
     }
 }

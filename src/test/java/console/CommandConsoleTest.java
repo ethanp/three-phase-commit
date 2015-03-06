@@ -67,7 +67,7 @@ public class CommandConsoleTest extends TestCommon {
         assertTrue(rawFailure instanceof PartialBroadcast);
         final PartialBroadcast failure = (PartialBroadcast) rawFailure;
         assertEquals(Message.Command.COMMIT, failure.getStage());
-        assertEquals(2, failure.getLastProcID());
+        assertEquals(2, failure.getCountProcs());
 
         final VoteRequest rawRequest = cmd.getVoteRequest();
         assertTrue(rawRequest instanceof AddRequest);
@@ -89,13 +89,13 @@ public class CommandConsoleTest extends TestCommon {
         assertTrue(rawFailure instanceof PartialBroadcast);
         final PartialBroadcast failure = (PartialBroadcast) rawFailure;
         assertEquals(Message.Command.COMMIT, failure.getStage());
-        assertEquals(2, failure.getLastProcID());
+        assertEquals(2, failure.getCountProcs());
 
         final Message rawFailure2 = failureModes.get(1);
         assertTrue(rawFailure2 instanceof PartialBroadcast);
         final PartialBroadcast failure2 = (PartialBroadcast) rawFailure2;
         assertEquals(Message.Command.PRE_COMMIT, failure2.getStage());
-        assertEquals(4, failure2.getLastProcID());
+        assertEquals(4, failure2.getCountProcs());
 
         final VoteRequest rawRequest = cmd.getVoteRequest();
         assertTrue(rawRequest instanceof AddRequest);

@@ -123,11 +123,14 @@ public class AsynchronousSystemTest extends TestCommon {
 
     /* FAILURE CASES */
 
-    @Ignore
+    @Test
     public void testCoordinatorFailsBeforeSendingVoteReq() throws Exception {
-        String cmdStr = "add a_song a_url -deathAfter 0 1";
-        ConsoleCommand command = new ConsoleCommand(cmdStr, TXID); // TODO
-//        assertEquals(COMMIT, system.processRequestToCompletion(command).getCommand());
+        String cmdStr = "add a_song a_url -deathAfter 1 1";
+        ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
+        assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
+
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS);
+        system.killAllNodes();
     }
 
     @Ignore
