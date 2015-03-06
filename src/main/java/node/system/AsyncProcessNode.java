@@ -114,8 +114,8 @@ public class AsyncProcessNode extends Node {
     }
 
     public static void main(String[] args) throws IOException {
-        int systemListenPort = args.length > 0 ? Integer.parseInt(args[0]) : 3000;
-        int nodeID = args.length > 1 ? Integer.parseInt(args[1]) : 55;
+        int nodeID = args.length > 0 ? Integer.parseInt(args[0]) : 55;
+        int systemListenPort = args.length > 1 ? Integer.parseInt(args[1]) : 3000;
         System.out.println("Node "+nodeID+" booting in its own process");
         AsyncProcessNode node = new AsyncProcessNode(systemListenPort, nodeID);
     }

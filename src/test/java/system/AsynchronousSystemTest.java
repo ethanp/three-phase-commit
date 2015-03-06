@@ -1,5 +1,6 @@
 package system;
 
+import console.ConsoleCommand;
 import jdk.nashorn.internal.ir.annotations.Ignore;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
@@ -8,8 +9,6 @@ import messages.vote_req.VoteRequest;
 import node.PeerReference;
 import org.junit.Before;
 import org.junit.Test;
-import system.failures.DeathAfter;
-import system.failures.Failure;
 import util.Common;
 import util.TestCommon;
 
@@ -126,11 +125,9 @@ public class AsynchronousSystemTest extends TestCommon {
 
     @Ignore
     public void testCoordinatorFailsBeforeSendingVoteReq() throws Exception {
-        Failure f = new DeathAfter(TestCommon.TEST_COORD_ID, 0);
-        VoteRequest addRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
-        String cmdStr = "add a_song a_url etc.";
-//        Message.Command command = new CommandConsole.Command(cmdStr, TXID);
-        assertEquals(COMMIT, system.processRequestToCompletion(addRequest).getCommand());
+        String cmdStr = "add a_song a_url -deathAfter 0 1";
+        ConsoleCommand command = new ConsoleCommand(cmdStr, TXID); // TODO
+//        assertEquals(COMMIT, system.processRequestToCompletion(command).getCommand());
     }
 
     @Ignore

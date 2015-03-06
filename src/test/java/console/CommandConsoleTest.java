@@ -1,5 +1,6 @@
 package console;
 
+import messages.KillSig;
 import messages.Message;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
@@ -7,7 +8,6 @@ import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import org.junit.Test;
 import system.failures.DeathAfter;
-import system.failures.Failure;
 import system.failures.PartialBroadcast;
 import util.TestCommon;
 
@@ -61,9 +61,9 @@ public class CommandConsoleTest extends TestCommon {
         String cmdStr = "add a b -partialCommit 2";
         ConsoleCommand cmd = new ConsoleCommand(cmdStr, TXID);
 
-        final List<Failure> failureModes = cmd.getFailureModes();
+        final List<Message> failureModes = cmd.getFailureModes();
         assertEquals(1, failureModes.size());
-        final Failure rawFailure = failureModes.get(0);
+        final Message rawFailure = failureModes.get(0);
         assertTrue(rawFailure instanceof PartialBroadcast);
         final PartialBroadcast failure = (PartialBroadcast) rawFailure;
         assertEquals(Message.Command.COMMIT, failure.getStage());
@@ -82,16 +82,16 @@ public class CommandConsoleTest extends TestCommon {
         String cmdStr = "add a b -partialCommit 2 -partialPrecommit 4";
         ConsoleCommand cmd = new ConsoleCommand(cmdStr, TXID);
 
-        final List<Failure> failureModes = cmd.getFailureModes();
+        final List<Message> failureModes = cmd.getFailureModes();
         assertEquals(2, failureModes.size());
 
-        final Failure rawFailure = failureModes.get(0);
+        final Message rawFailure = failureModes.get(0);
         assertTrue(rawFailure instanceof PartialBroadcast);
         final PartialBroadcast failure = (PartialBroadcast) rawFailure;
         assertEquals(Message.Command.COMMIT, failure.getStage());
         assertEquals(2, failure.getLastProcID());
 
-        final Failure rawFailure2 = failureModes.get(1);
+        final Message rawFailure2 = failureModes.get(1);
         assertTrue(rawFailure2 instanceof PartialBroadcast);
         final PartialBroadcast failure2 = (PartialBroadcast) rawFailure2;
         assertEquals(Message.Command.PRE_COMMIT, failure2.getStage());
@@ -110,9 +110,9 @@ public class CommandConsoleTest extends TestCommon {
         String cmdStr = "update a b c -deathAfter 2 5";
         ConsoleCommand cmd = new ConsoleCommand(cmdStr, TXID);
 
-        final List<Failure> failureModes = cmd.getFailureModes();
+        final List<Message> failureModes = cmd.getFailureModes();
         assertEquals(1, failureModes.size());
-        final Failure rawFailure = failureModes.get(0);
+        final Message rawFailure = failureModes.get(0);
         assertTrue(rawFailure instanceof DeathAfter);
         final DeathAfter failure = (DeathAfter) rawFailure;
         assertEquals(2, failure.getNumMsgs());
@@ -124,19 +124,38 @@ public class CommandConsoleTest extends TestCommon {
         String cmdStr = "update a b c -deathAfter 2 5 -deathAfter 3 5";
         ConsoleCommand cmd = new ConsoleCommand(cmdStr, TXID);
 
-        final List<Failure> failureModes = cmd.getFailureModes();
+        final List<Message> failureModes = cmd.getFailureModes();
         assertEquals(2, failureModes.size());
 
-        final Failure rawFailure = failureModes.get(0);
+        final Message rawFailure = failureModes.get(0);
         assertTrue(rawFailure instanceof DeathAfter);
         final DeathAfter failure = (DeathAfter) rawFailure;
         assertEquals(2, failure.getNumMsgs());
         assertEquals(5, failure.getProcID());
 
-        final Failure rawFailure2 = failureModes.get(1);
+        final Message rawFailure2 = failureModes.get(1);
         assertTrue(rawFailure2 instanceof DeathAfter);
         final DeathAfter failure2 = (DeathAfter) rawFailure2;
         assertEquals(3, failure2.getNumMsgs());
         assertEquals(5, failure2.getProcID());
+    }
+
+    @Test
+    public void testDelay() throws Exception {
+        String cmdStr = "delete a -partialCommit 5 -delay 4 -deathAfter 3 5";
+        ConsoleCommand cmd = new ConsoleCommand(cmdStr, TXID);
+        final List<Message> failureModes = cmd.getFailureModes();
+        assertEquals(2, failureModes.size());
+        assertEquals(4, cmd.getDelay());
+    }
+
+    @Test
+    public void testKillSig() throws Exception {
+        String cmdStr = "kill 4";
+        ConsoleCommand cmd = new ConsoleCommand(cmdStr, TXID);
+        VoteRequest voteRequest = cmd.getVoteRequest();
+        assertTrue(voteRequest instanceof KillSig);
+        KillSig killSig = (KillSig) voteRequest;
+        assertEquals(4, killSig.getNodeID());
     }
 }

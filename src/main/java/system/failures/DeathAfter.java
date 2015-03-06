@@ -1,11 +1,16 @@
 package system.failures;
 
+import messages.Message;
+import messages.TokenReader;
+import messages.TokenWriter;
+import sun.reflect.generics.reflectiveObjects.NotImplementedException;
+
 /**
  * Ethan Petuchowski 3/3/15
  */
-public class DeathAfter extends Failure {
+public class DeathAfter extends Message {
     public DeathAfter(int numMsgs, int procID) {
-        super(Case.DEATH_AFTER);
+        super(Command.DEATH_AFTER);
         this.numMsgs = numMsgs;
         this.procID = procID;
     }
@@ -19,5 +24,13 @@ public class DeathAfter extends Failure {
 
     public int getProcID() {
         return procID;
+    }
+
+    @Override protected void writeAsTokens(TokenWriter writer) {
+        throw new NotImplementedException();
+    }
+
+    @Override protected void readFromTokens(TokenReader reader) {
+        throw new NotImplementedException();
     }
 }
