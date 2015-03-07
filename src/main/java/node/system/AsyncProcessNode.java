@@ -33,8 +33,6 @@ public class AsyncProcessNode extends Node {
         System.out.println("Node "+getMyNodeID()+": log on startup:");
         System.out.println(dtLog.getLogAsString());
 
-        recoverFromDtLog();
-
         /* start local server */
         nodeServer = new NodeServer();
         L = new AsyncLogger(getMyNodeID(), getListenPort());
@@ -55,6 +53,8 @@ public class AsyncProcessNode extends Node {
             L.OG("couldn't establish connection to the System");
             System.exit(Common.EXIT_FAILURE);
         }
+
+        recoverFromDtLog();
     }
 
     int getListenPort() {

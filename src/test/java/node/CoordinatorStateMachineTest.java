@@ -17,7 +17,6 @@ import node.system.SyncNode;
 import org.junit.Before;
 import org.junit.Test;
 
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.network.QueueConnection;
 import system.network.QueueSocket;
 import util.Common;
@@ -25,7 +24,6 @@ import util.SongTuple;
 import util.TestCommon;
 
 import java.util.ArrayList;
-import java.util.Queue;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
@@ -44,7 +42,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
     AddRequest add;
     UpdateRequest update;
     DeleteRequest delete;
-    
+
     @Before
     public void setUp() throws Exception {
         /* connect a syncNode to this test setup */
@@ -68,10 +66,10 @@ public class CoordinatorStateMachineTest extends TestCommon {
             syncNode.addConnection(coordinatorToPeer);
             coordinatorPeerReferences.add(new PeerReference(peerId, 0));
         }
-        
+
 		song = new SongTuple("song", "url");
 		updatedSong = new SongTuple("song", "updated");
-		
+
 		add = new AddRequest(song, TXID, coordinatorPeerReferences);
 		update = new UpdateRequest("song", updatedSong, TXID, coordinatorPeerReferences);
 		delete = new DeleteRequest("song", TXID, coordinatorPeerReferences);
@@ -83,13 +81,13 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		assertTrue(csm.receiveMessage(coordinatorToTxnMgr));
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForVotes, csm.getState());
     }
-    
+
     private void receiveFailingCommandFromTransactionManager(VoteRequest voteRequest) {
         txnMgrToCoordinator.sendMessage(voteRequest);
 		assertTrue(csm.receiveMessage(coordinatorToTxnMgr));
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
     }
-    
+
     private void peerRespondsWithYes(int peerIndex) {
 		peerQueueSockets[peerIndex].getConnectionToBID().sendMessage(new YesResponse(request));
 		assertTrue(csm.receiveMessage(peerQueueSockets[peerIndex].getConnectionToAID()));
@@ -109,11 +107,11 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		peerQueueSockets[peerIndex].getConnectionToBID().sendMessage(new PeerTimeout(peerIndex + 2));
 		assertTrue(csm.receiveMessage(peerQueueSockets[peerIndex].getConnectionToAID()));
     }
-    
+
     private Message getLastMesageToTxnMgr() {
     	return getLastMessageInQueue(coordinatorToTxnMgr.getOutQueue());
     }
-    
+
     private Message getLastMessageToPeer(int peerIndex) {
     	return getLastMessageInQueue(peerQueueSockets[peerIndex].getConnectionToAID().getOutQueue());
     }
@@ -245,8 +243,8 @@ public class CoordinatorStateMachineTest extends TestCommon {
 
     @Test
     public void testUpdateStateOnCommit_updateSong() throws Exception {
-    	syncNode.addSong(song);
-    	
+    	syncNode.addSongToPlaylist(song);
+
         receiveCommandFromTransactionManager(update);
         peerRespondsWithYes(0);
         peerRespondsWithYes(1);
@@ -257,8 +255,8 @@ public class CoordinatorStateMachineTest extends TestCommon {
 
     @Test
     public void testUpdateStateOnCommit_deleteSong() throws Exception {
-    	syncNode.addSong(song);
-    	
+    	syncNode.addSongToPlaylist(song);
+
         receiveCommandFromTransactionManager(delete);
         peerRespondsWithYes(0);
         peerRespondsWithYes(1);
@@ -269,8 +267,8 @@ public class CoordinatorStateMachineTest extends TestCommon {
 
     @Test
     public void testAbortRequestToAddExistingSong() throws Exception {
-    	syncNode.addSong(song);
-    	
+    	syncNode.addSongToPlaylist(song);
+
     	receiveFailingCommandFromTransactionManager(add);
 		Message abort = getLastMesageToTxnMgr();
 		assertEquals(Message.Command.ABORT, abort.getCommand());
@@ -298,7 +296,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		receiveCommandFromTransactionManager(add);
 		peerRespondsWithNo(0);
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
-		
+
 		peerRespondsWithNo(1);
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
     }
@@ -308,7 +306,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		receiveCommandFromTransactionManager(add);
 		peerRespondsWithNo(0);
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
-		
+
 		peerRespondsWithYes(1);
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
     }

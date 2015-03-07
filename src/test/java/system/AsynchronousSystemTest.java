@@ -2,11 +2,13 @@ package system;
 
 import console.ConsoleCommand;
 import jdk.nashorn.internal.ir.annotations.Ignore;
+import messages.Message;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.PeerReference;
+import node.system.FileDTLog;
 import org.junit.Before;
 import org.junit.Test;
 import util.Common;
@@ -17,7 +19,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static messages.Message.Command.ABORT;
@@ -25,6 +29,7 @@ import static messages.Message.Command.COMMIT;
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.assertTrue;
 
 public class AsynchronousSystemTest extends TestCommon {
     AsynchronousSystem system;
@@ -211,7 +216,22 @@ public class AsynchronousSystemTest extends TestCommon {
         assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
 
         Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);
+        assertLogContains(2, COMMIT, TXID);
         system.killAllNodes();
+    }
+
+    @Test
+    public void testCoordinatorFailsAfterSendingPrecommitToAll() throws Exception {
+        String cmdStr = "add a_song a_url -partialPrecommit "
+
+    }
+
+    private void assertLogContains(int nodeID, Message.Command command, int txid) throws IOException {
+        Collection<Message> msgs = new FileDTLog(new File("logDir", String.valueOf(nodeID)), null).getLoggedMessages();
+        Optional<Message> opM = msgs.stream()
+                                    .filter(m -> m.getCommand() == command && m.getTransactionID() == txid)
+                                    .findFirst();
+        assertTrue(opM.isPresent());
     }
 
 }

@@ -121,7 +121,7 @@ public class ParticipantStateMachineTest extends TestCommon {
     public void testReceiveInvalidAddRequest_existingSong() throws Exception {
 
         /* node already has the song */
-        participantUnderTest.addSong(A_SONG_TUPLE);
+        participantUnderTest.addSongToPlaylist(A_SONG_TUPLE);
 
         /* then receives a request to add it */
         final AddRequest msg = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
@@ -142,7 +142,7 @@ public class ParticipantStateMachineTest extends TestCommon {
     public void testReceiveInvalidAddRequest_sameName_differentURL() throws Exception {
 
         /* node already has the song */
-        participantUnderTest.addSong(A_SONG_TUPLE);
+        participantUnderTest.addSongToPlaylist(A_SONG_TUPLE);
 
         /* then receives a request to add the same song with a new URL */
         final AddRequest msg = new AddRequest(SAME_SONG_NEW_URL, TXID, A_PEER_REFS);
@@ -166,7 +166,7 @@ public class ParticipantStateMachineTest extends TestCommon {
     @Test
     public void testReceiveValidUpdateRequest() throws Exception {
         /* node already has the song */
-        participantUnderTest.addSong(A_SONG_TUPLE);
+        participantUnderTest.addSongToPlaylist(A_SONG_TUPLE);
 
         /* same name new URL */
         Message msg = new UpdateRequest(A_SONG_NAME, SAME_SONG_NEW_URL, TXID, A_PEER_REFS);
@@ -198,7 +198,7 @@ public class ParticipantStateMachineTest extends TestCommon {
     @Test
     public void testReceiveValidDeleteRequest() throws Exception {
         /* node already has the song */
-        participantUnderTest.addSong(A_SONG_TUPLE);
+        participantUnderTest.addSongToPlaylist(A_SONG_TUPLE);
 
         Message msg = new DeleteRequest(A_SONG_NAME, TXID, A_PEER_REFS);
         testReceiveFromCoordinator(msg);
@@ -272,7 +272,7 @@ public class ParticipantStateMachineTest extends TestCommon {
     public void testReceiveValidCommit_updateRequest() throws Exception {
 
         /* proper precommit state for update request */
-        participantUnderTest.addSong(A_SONG_TUPLE);
+        participantUnderTest.addSongToPlaylist(A_SONG_TUPLE);
         assertTrue(participantUnderTest.hasExactSongTuple(A_SONG_TUPLE));
         participantSM.setOngoingTransactionID(TXID);
         participantSM.setPrecommitted(true);
@@ -297,7 +297,7 @@ public class ParticipantStateMachineTest extends TestCommon {
     public void testReceiveValidCommit_deleteRequest() throws Exception {
 
         /* proper precommit state for delete request */
-        participantUnderTest.addSong(A_SONG_TUPLE);
+        participantUnderTest.addSongToPlaylist(A_SONG_TUPLE);
         assertTrue(participantUnderTest.hasExactSongTuple(A_SONG_TUPLE));
         participantSM.setOngoingTransactionID(TXID);
         participantSM.setPrecommitted(true);
@@ -379,7 +379,7 @@ public class ParticipantStateMachineTest extends TestCommon {
                 .stream()
                 .map(PeerReference::clone)
                 .collect(Collectors.toList()));
-  	
+
         testReceiveFromCoordinator(new ElectedMessage(TXID));
 
         CoordinatorStateMachine coordinator = (CoordinatorStateMachine)participantUnderTest.getStateMachine();

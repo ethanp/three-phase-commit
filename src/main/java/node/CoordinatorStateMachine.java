@@ -7,6 +7,7 @@ import messages.Message;
 import messages.PeerTimeout;
 import messages.PrecommitRequest;
 import messages.StateRequest;
+import messages.UncertainResponse;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
@@ -14,7 +15,6 @@ import system.network.Connection;
 import util.Common;
 
 import java.io.EOFException;
-import java.io.ObjectInputStream.GetField;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.stream.Collectors;
@@ -51,11 +51,11 @@ public class CoordinatorStateMachine extends StateMachine {
 		machine.setupTransactionConnectionsAndSendMessage(new StateRequest(machine.ongoingTransactionID), notMe);
 		return machine;
 	}
-	
+
 	public static CoordinatorStateMachine startInNormalMode(Node ownerNode) {
 		return new CoordinatorStateMachine(ownerNode);
 	}
-	
+
 	private CoordinatorStateMachine(Node ownerNode) {
 		this.ownerNode = ownerNode;
 		resetToWaiting();
@@ -68,11 +68,11 @@ public class CoordinatorStateMachine extends StateMachine {
 	public int getOngoingTransactionId() {
 		return ongoingTransactionID;
 	}
-	
+
 	public VoteRequest getAction() {
 		return action;
 	}
-	
+
     @Override public boolean receiveMessage(Connection overConnection) {
 
         Message message;
@@ -140,8 +140,23 @@ public class CoordinatorStateMachine extends StateMachine {
                     onTimeout(ref);
                     break;
 
-                // TODO decision request
                 case DECISION_REQUEST:
+                    /* reply with most-recent decision */
+                    if (state == CoordinatorState.WaitingForCommand) {
+                        Message dec = ownerNode.getDecisionFor(message.getTransactionID());
+                        if (dec == null) {
+                            throw new RuntimeException("Couldn't find decision for txn "+message.getTransactionID());
+                        }
+                        ownerNode.send(overConnection, dec);
+                    }
+
+                    /* either
+                        1. this coordinator is leading the charge for a recovery from total failure
+                        2. we haven't come to a decision yet (unlikely)
+                     */
+                    else {
+                        ownerNode.send(overConnection, new UncertainResponse(message.getTransactionID()));
+                    }
                     break;
 
                 /* fail cases */
@@ -224,7 +239,7 @@ public class CoordinatorStateMachine extends StateMachine {
 	private void setupTransactionConnectionsAndSendMessage(Message message,
 			final Collection<PeerReference> peerSet) {
         Collection<Connection> conns = new ArrayList<>();
-		
+
 		/* connect to every peer the ownerNode is not already connected to */
 		for (PeerReference reference : peerSet) {
 
@@ -235,7 +250,7 @@ public class CoordinatorStateMachine extends StateMachine {
 		    if (conn != null) {
 			    conns.add(conn);
 			    ownerNode.send(conn, message);
-	
+
 			    /* start timers on everyone */
 			    ownerNode.resetTimersFor(reference.getNodeID());
 		    }
@@ -268,7 +283,7 @@ public class CoordinatorStateMachine extends StateMachine {
     		state = CoordinatorState.WaitingForAcks;
     	}
     }
-    
+
     private void checkForEnoughAcks() {
     	final Collection<PeerReference> peerSet = getPeerSet();
 		if (acks >= peerSet.size()) {
@@ -278,7 +293,7 @@ public class CoordinatorStateMachine extends StateMachine {
                 ownerNode.send(connection, commit);
 			}
             ownerNode.sendTxnMgrMsg(commit);
-            ownerNode.commitAction(action);
+            ownerNode.applyActionToVolatileStorage(action);
             resetToWaiting();
 		}
     }

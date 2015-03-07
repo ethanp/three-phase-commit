@@ -53,7 +53,12 @@ public abstract class Message implements Serializable {
         KILL_SIG,
         IN_RECOVERY,
         PARTIAL_BROADCAST,
-        DELAY, DEATH_AFTER
+        DELAY,
+        DEATH_AFTER;
+
+        public boolean isDecision() {
+            return (this == ABORT) || (this == COMMIT);
+        }
     }
     Command command;
 
