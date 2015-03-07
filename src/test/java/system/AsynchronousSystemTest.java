@@ -170,31 +170,6 @@ public class AsynchronousSystemTest extends TestCommon {
         system.killAllNodes();
     }
 
-    @Ignore
-    public void testCoordinatorFailsAfterSendingAllVoteReqs() throws Exception {
-        // not sure if these need to be implemented
-    }
-
-    @Ignore
-    public void testCoordinatorFailsAfterSendingSomeVoteReqs() throws Exception {
-
-    }
-
-    @Ignore
-    public void testParticipantFailsAfterReceivingVoteReq() throws Exception {
-
-    }
-
-    @Ignore
-    public void testParticipantFailsAfterLoggingNOBeforeSendingNO() throws Exception {
-
-    }
-
-    @Ignore
-    public void testParticipantFailsAfterLoggingYESBeforeSendingYES() throws Exception {
-
-    }
-
     @Test
     public void testParticipantFailsAfterSendingNO_txnCommits() throws Exception {
         /* this is already implementable
@@ -277,33 +252,5 @@ public class AsynchronousSystemTest extends TestCommon {
         system.killAllNodes();
     }
 
-    @Ignore
-    public void testCoordinatorFailsAfterReceivingNOBeforeSendingAbort() throws Exception {
-
-    }
-
-    @Ignore
-    public void testCoordinatorFailsAfterSendingAbortToEveryone() throws Exception {
-
-    }
-
-    @Ignore
-    public void testCoordinatorFailsAfterSendingAbortToOnlySome() throws Exception {
-
-    }
-
-    @Ignore
-    public void testCoordinatorFailsAfterReceivingYESesBeforeSendingPrecommit() throws Exception {
-
-    }
-
-    @Ignore
-    public void testCoordinatorFailsAfterSendingPrecommitToEveryone() throws Exception {
-
-    }
-
-    @Ignore
-    public void testCoordinatorFailsAfterSendingPrecommitToOnlySome() throws Exception {
-
-    }
+    
 }
