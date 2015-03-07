@@ -166,8 +166,4 @@ public class TotalFailureRecoveryTest extends TestCommon {
 		Message lastToTxnMgr = getLastMessageInQueue(coordinatorToTxnMgr.getOutQueue());
 		assertEquals(Command.ABORT, lastToTxnMgr.getCommand());
 	}
-	
-	// test that if coordinator in term. protocol receives abort, decide abort
-	// test that if receives commit, decide commit
-	// test that if some process sends committable and nobody has committed, then we go through precommit rigmarole
 }

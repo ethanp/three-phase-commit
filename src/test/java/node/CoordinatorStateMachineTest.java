@@ -7,11 +7,15 @@ import messages.DubCoordinatorMessage;
 import messages.Message;
 import messages.NoResponse;
 import messages.PeerTimeout;
+import messages.PrecommitRequest;
+import messages.UncertainResponse;
 import messages.YesResponse;
+import messages.Message.Command;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
+import node.CoordinatorStateMachine.CoordinatorState;
 import node.system.SyncNode;
 
 import org.junit.Before;
@@ -61,6 +65,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 
         peerQueueSockets = new QueueSocket[2];
         coordinatorPeerReferences = new ArrayList<PeerReference>();
+        coordinatorPeerReferences.add(new PeerReference(TEST_COORD_ID, 0));
         for (int i = 0; i < 2; ++i) {
         	final int peerId = i + 2;
         	peerQueueSockets[i] = new QueueSocket(peerId, TEST_COORD_ID);
@@ -68,6 +73,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
             syncNode.addConnection(coordinatorToPeer);
             coordinatorPeerReferences.add(new PeerReference(peerId, 0));
         }
+        syncNode.setUpSet(coordinatorPeerReferences);
         
 		song = new SongTuple("song", "url");
 		updatedSong = new SongTuple("song", "updated");
@@ -90,14 +96,17 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
     }
     
-    private void peerRespondsWithYes(int peerIndex) {
-		peerQueueSockets[peerIndex].getConnectionToBID().sendMessage(new YesResponse(request));
+    private void peerRespondsWith(int peerIndex, Message response) {
+		peerQueueSockets[peerIndex].getConnectionToBID().sendMessage(response);
 		assertTrue(csm.receiveMessage(peerQueueSockets[peerIndex].getConnectionToAID()));
+    }
+    
+    private void peerRespondsWithYes(int peerIndex) {
+		peerRespondsWith(peerIndex, new YesResponse(request));
     }
 
     private void peerRespondsWithNo(int peerIndex) {
-		peerQueueSockets[peerIndex].getConnectionToBID().sendMessage(new NoResponse(request));
-		assertTrue(csm.receiveMessage(peerQueueSockets[peerIndex].getConnectionToAID()));
+		peerRespondsWith(peerIndex, new NoResponse(request));
     }
 
     private void peerAcknowledgesPrecommit(int peerIndex) {
@@ -123,6 +132,11 @@ public class CoordinatorStateMachineTest extends TestCommon {
         return (Message)messages[messages.length - 1];
     }
 
+    private void startInTerminationProtocol(VoteRequest action) {
+    	syncNode.becomeCoordinatorInRecovery(action);
+    	csm = (CoordinatorStateMachine)syncNode.getStateMachine();
+    }
+    
 	@Test
 	public void testReceiveCommandFromTransactionManager_sendsVoteRequest() {
 		receiveCommandFromTransactionManager(add);
@@ -311,5 +325,72 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		
 		peerRespondsWithYes(1);
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
+    }
+    
+    @Test
+    public void startCoordinatorInRecovery_peerSendsCommit_sendCommitToEveryoneElse() {
+    	startInTerminationProtocol(add);
+    	assertEquals(CoordinatorState.WaitingForStates, csm.getState());
+    	peerRespondsWith(0, new CommitRequest(TXID));
+    	
+    	Message last = getLastMessageToPeer(0);
+    	assertEquals(Command.STATE_REQUEST, last.getCommand());	// nothing was sent to 0 after the state_req
+    	last = getLastMessageToPeer(1);
+    	assertEquals(Command.COMMIT, last.getCommand());
+    	last = getLastMesageToTxnMgr();
+    	assertEquals(Command.COMMIT, last.getCommand());
+    	assertEquals(CoordinatorState.WaitingForCommand, csm.getState());
+    }
+
+    @Test
+    public void startCoordinatorInRecovery_firstPeerSendsCommitThenSecondSendsUncertain_noFurtherEffect() {
+    	startInTerminationProtocol(add);
+    	assertEquals(CoordinatorState.WaitingForStates, csm.getState());
+    	peerRespondsWith(0, new CommitRequest(TXID));
+    	assertEquals(CoordinatorState.WaitingForCommand, csm.getState());
+    	
+    	peerRespondsWith(1, new UncertainResponse(TXID));
+    	assertEquals(CoordinatorState.WaitingForCommand, csm.getState());
+    }
+    
+    @Test
+    public void startCoordinatorInRecovery_peerSendsAbort_sendAbortToEveryoneElse() {
+    	startInTerminationProtocol(add);
+    	assertEquals(CoordinatorState.WaitingForStates, csm.getState());
+    	peerRespondsWith(0, new AbortRequest(TXID));
+    	
+    	Message last = getLastMessageToPeer(0);
+    	assertEquals(Command.STATE_REQUEST, last.getCommand());	// nothing was sent to 0 after the state_req
+    	last = getLastMessageToPeer(1);
+    	assertEquals(Command.ABORT, last.getCommand());
+    	last = getLastMesageToTxnMgr();
+    	assertEquals(Command.ABORT, last.getCommand());
+    	assertEquals(CoordinatorState.WaitingForCommand, csm.getState());
+    }
+    
+    @Test
+    public void startCoordinatorInRecovery_firstPeerSendsAbortThenSecondSendsUncertain_noFurtherEffect() {
+    	startInTerminationProtocol(add);
+    	assertEquals(CoordinatorState.WaitingForStates, csm.getState());
+    	peerRespondsWith(0, new CommitRequest(TXID));
+    	assertEquals(CoordinatorState.WaitingForCommand, csm.getState());
+    	
+    	peerRespondsWith(1, new UncertainResponse(TXID));
+    	assertEquals(CoordinatorState.WaitingForCommand, csm.getState());
+    }
+    
+    @Test
+    public void starCoordinatortInRecovery_onePeerSendsPrecommitAndOtherSendsUncertain_handledAsPrecommit() {
+    	startInTerminationProtocol(add);
+    	assertEquals(CoordinatorState.WaitingForStates, csm.getState());
+    	peerRespondsWith(0, new PrecommitRequest(TXID));
+    	assertEquals(CoordinatorState.WaitingForStates, csm.getState());
+    	peerRespondsWith(1, new UncertainResponse(TXID));
+    	
+    	Message last = getLastMessageToPeer(0);
+    	assertEquals(Command.PRE_COMMIT, last.getCommand());
+    	last = getLastMessageToPeer(1);
+    	assertEquals(Command.PRE_COMMIT, last.getCommand());
+    	assertEquals(CoordinatorState.WaitingForAcks, csm.getState());
     }
 }
