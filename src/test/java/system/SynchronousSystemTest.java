@@ -103,7 +103,7 @@ public class SynchronousSystemTest extends TestCommon {
     @Test
     public void testReceiveAbortWhenAddingPartiallyReplicatedSong_onlyOnAParticipant() throws Exception {
 
-        participant.addSong(A_SONG_TUPLE);
+        participant.addSongToPlaylist(A_SONG_TUPLE);
 
         VoteRequest voteRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
         assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
@@ -115,7 +115,7 @@ public class SynchronousSystemTest extends TestCommon {
     @Test
     public void testReceiveAbortWhenAddingPartiallyReplicatedSong_onlyOnCoordinator() throws Exception {
 
-        coordinator.addSong(A_SONG_TUPLE);
+        coordinator.addSongToPlaylist(A_SONG_TUPLE);
 
         VoteRequest voteRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
         assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
@@ -127,7 +127,7 @@ public class SynchronousSystemTest extends TestCommon {
     @Test
     public void testReceiveAbortWhenUpdatingPartiallyReplicatedSong_onlyOnAParticipant() throws Exception {
 
-        participant.addSong(A_SONG_TUPLE);
+        participant.addSongToPlaylist(A_SONG_TUPLE);
 
         VoteRequest voteRequest = new UpdateRequest(A_SONG_NAME, SAME_SONG_NEW_URL, TXID, peerReferences);
         assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
@@ -139,7 +139,7 @@ public class SynchronousSystemTest extends TestCommon {
     @Test
     public void testReceiveAbortWhenUpdatingPartiallyReplicatedSong_onlyOnCoordinator() throws Exception {
 
-        coordinator.addSong(A_SONG_TUPLE);
+        coordinator.addSongToPlaylist(A_SONG_TUPLE);
 
         VoteRequest voteRequest = new UpdateRequest(A_SONG_NAME, SAME_SONG_NEW_URL, TXID, peerReferences);
         assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
@@ -151,7 +151,7 @@ public class SynchronousSystemTest extends TestCommon {
     @Test
     public void testReceiveAbortWhenDeletingPartiallyReplicatedSong_onlyAParticipantIsMissingIt() throws Exception {
 
-        coordinator.addSong(A_SONG_TUPLE);
+        coordinator.addSongToPlaylist(A_SONG_TUPLE);
 
         VoteRequest voteRequest = new DeleteRequest(A_SONG_NAME, TXID, peerReferences);
         assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());
@@ -163,7 +163,7 @@ public class SynchronousSystemTest extends TestCommon {
     @Test
     public void testReceiveAbortWhenDeletingPartiallyReplicatedSong_onlyCoordinatorIsMissingIt() throws Exception {
 
-        participant.addSong(A_SONG_TUPLE);
+        participant.addSongToPlaylist(A_SONG_TUPLE);
 
         VoteRequest voteRequest = new DeleteRequest(A_SONG_NAME, TXID, peerReferences);
         assertEquals(ABORT, system.processRequestToCompletion(voteRequest).getCommand());

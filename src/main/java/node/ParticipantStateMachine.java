@@ -21,11 +21,8 @@ import system.network.Connection;
 import util.Common;
 
 import java.io.EOFException;
-import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.PriorityQueue;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 import static util.Common.NO_ONGOING_TRANSACTION;
@@ -47,7 +44,7 @@ public class ParticipantStateMachine extends StateMachine {
     private int coordinatorId;
 
     public static ParticipantStateMachine startInTerminationProtocol(Node ownerNode, VoteRequest action, boolean precommit) {
-    	ParticipantStateMachine machine = new ParticipantStateMachine(ownerNode);
+        ParticipantStateMachine machine = new ParticipantStateMachine(ownerNode);
     	machine.action = action;
     	machine.ongoingTransactionID = action.getTransactionID();
     	machine.precommitted = precommit;
@@ -222,7 +219,7 @@ public class ParticipantStateMachine extends StateMachine {
 
     private void receiveCommit(CommitRequest commitRequest) {
         node.logMessage(commitRequest);
-        node.commitAction(action);
+        node.applyActionToVolatileStorage(action);
         setOngoingTransactionID(NO_ONGOING_TRANSACTION);
     }
 

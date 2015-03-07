@@ -24,14 +24,13 @@ import util.SongTuple;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-
-import javax.jws.Oneway;
 
 import static util.Common.TIMEOUT_MONITOR_ID;
 
@@ -89,6 +88,7 @@ public abstract class Node implements MessageReceiver {
     	}
     	else {
     		stateMachine = new ParticipantRecoveryStateMachine(this, uncommitted, recoveryMachine.getLastUpSet());
+            ((ParticipantRecoveryStateMachine)stateMachine).sendDecisionRequestToCurrentPeer();
     	}
     }
 
@@ -132,35 +132,35 @@ public abstract class Node implements MessageReceiver {
         return playlist.contains(new SongTuple(name, "doesn't matter"));
     }
 
-    public void commitAction(VoteRequest action) {
+    public void applyActionToVolatileStorage(VoteRequest action) {
         switch (action.getCommand()) {
         case ADD:
-            commitAdd((AddRequest) action);
+            applyAddToVolatilePlaylist((AddRequest) action);
             break;
         case UPDATE:
-            commitUpdate((UpdateRequest) action);
+            applyUpdateToVolatilePlaylist((UpdateRequest) action);
             break;
         case DELETE:
-            commitDelete((DeleteRequest) action);
+            applyDeleteToVolatilePlaylist((DeleteRequest) action);
             break;
         default:
         	break;
 	    }
     }
 
-    private void commitDelete(DeleteRequest deleteRequest) {
+    private void applyDeleteToVolatilePlaylist(DeleteRequest deleteRequest) {
         removeSongWithName(deleteRequest.getSongName());
     }
 
-    private void commitUpdate(UpdateRequest updateRequest) {
+    private void applyUpdateToVolatilePlaylist(UpdateRequest updateRequest) {
         updateSong(updateRequest.getSongName(), updateRequest.getUpdatedSong());
     }
 
-    private void commitAdd(AddRequest addRequest) {
-        addSong(addRequest.getSongTuple());
+    private void applyAddToVolatilePlaylist(AddRequest addRequest) {
+        addSongToPlaylist(addRequest.getSongTuple());
     }
 
-    public boolean addSong(SongTuple songTuple) {
+    public boolean addSongToPlaylist(SongTuple songTuple) {
         return playlist.add(songTuple);
     }
 
@@ -170,7 +170,7 @@ public abstract class Node implements MessageReceiver {
 
     public void updateSong(String songName, SongTuple updatedSong) {
         removeSongWithName(songName);
-        addSong(updatedSong);
+        addSongToPlaylist(updatedSong);
     }
 
     @Override public boolean receiveMessageFrom(Connection connection, int msgsRcvd) {
@@ -188,7 +188,7 @@ public abstract class Node implements MessageReceiver {
     public void becomeCoordinator() {
         stateMachine = CoordinatorStateMachine.startInNormalMode(this);
     }
-    
+
     public void becomeCoordinatorInRecovery(VoteRequest ongoingAction) {
     	stateMachine = CoordinatorStateMachine.startInTerminationProtocol(this, ongoingAction);
     }
@@ -196,7 +196,7 @@ public abstract class Node implements MessageReceiver {
     public void becomeParticipant() {
     	stateMachine = new ParticipantStateMachine(this);
     }
-    
+
     public void becomeParticipantInRecovery(VoteRequest ongoingAction, boolean precommit) {
     	stateMachine = ParticipantStateMachine.startInTerminationProtocol(this, ongoingAction, precommit);
     }
@@ -250,7 +250,7 @@ public abstract class Node implements MessageReceiver {
     public void setUpSet(Collection<PeerReference> upSet) {
         this.upSet = upSet;
     }
-    
+
     public void resetTimersFor(int peerID) {
         timeoutMonitor.resetTimersFor(peerID);
     }
@@ -258,19 +258,19 @@ public abstract class Node implements MessageReceiver {
     public void cancelTimersFor(int peerID) {
         timeoutMonitor.cancelTimersFor(peerID);
     }
-    
+
     public void electNewLeader(VoteRequest ongoingAction, boolean precommitted) {
     	PeerReference newCoordinator = upSet.stream().min((a, b) -> a.compareTo(b)).get();
-    	if (newCoordinator.getNodeID() == myNodeID) {    		
-    		becomeCoordinatorInRecovery(ongoingAction);    		
+    	if (newCoordinator.getNodeID() == myNodeID) {
+    		becomeCoordinatorInRecovery(ongoingAction);
     	}
     	else {
     		getOrConnectToPeer(newCoordinator).sendMessage(new ElectedMessage(ongoingAction.getTransactionID()));
     		resetTimersFor(newCoordinator.getNodeID());
     		stateMachine = ParticipantStateMachine.startInTerminationProtocol(this, ongoingAction, precommitted);
-    	}        
+    	}
     }
-    
+
     public Connection getOrConnectToPeer(PeerReference peer) {
         Connection connection = isConnectedTo(peer)
                 ? getPeerConnForId(peer.getNodeID())
@@ -301,10 +301,20 @@ public abstract class Node implements MessageReceiver {
                 selfDestruct();
             }
 		}
-		sendTxnMgrMsg(request);
+        sendTxnMgrMsg(request);
     }
 
     protected abstract void selfDestruct();
+
+    public Message getDecisionFor(int transactionID) {
+        List<Message> messages = new ArrayList<>(getDtLog().getLoggedMessages());
+        Collections.reverse(messages);
+        return messages.stream()
+                       .filter(m -> m.getTransactionID() == transactionID
+                                    && m.getCommand().isDecision())
+                       .findFirst()
+                       .orElse(null);
+    }
 
     private class TimeoutMonitor {
 
