@@ -4,12 +4,17 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.Collection;
+
+import messages.Message;
 import messages.PeerTimeout;
 import messages.YesResponse;
+import messages.Message.Command;
 import messages.vote_req.AddRequest;
 import node.system.SyncNode;
+
 import org.junit.Before;
 import org.junit.Test;
+
 import system.network.QueueSocket;
 import util.SongTuple;
 import util.TestCommon;
@@ -104,7 +109,7 @@ public class TotalFailureRecoveryTest extends TestCommon {
 		assertTrue(secondRecoveredSet.contains(1));
 		assertTrue(secondRecoveredSet.contains(2));		
         // second node sends decision_req to third node, which times out
-        twoToThree.getConnectionToBID().getInQueue().clear();	// remove the message so it isn't received later
+        twoToThree.getConnectionToBID().getOutQueue().clear();	// remove the message so it isn't received later
         twoToThree.getConnectionToAID().sendMessage(new PeerTimeout(3));
 		assertTrue(secondNode.getStateMachine().receiveMessage(twoToThree.getConnectionToBID()));
         // second node is now waiting for a coordinator; check its up set
@@ -133,8 +138,23 @@ public class TotalFailureRecoveryTest extends TestCommon {
 		assertTrue(secondNode.getStateMachine().receiveMessage(twoToThree.getConnectionToBID()));
 		assertTrue(thirdNode.getStateMachine().receiveMessage(twoToThree.getConnectionToAID()));
         // third node now sends ur_elected to first node, and changes to participant recovery state
-		fail("todo");
+		assertTrue(firstNode.getStateMachine().receiveMessage(oneToThree.getConnectionToBID()));
 		// first node is now in coordinator termination protocol, and sends state_request to second and third nodes
-		// second node is still waiting for a coordinator
+		assertTrue(firstNode.getStateMachine() instanceof CoordinatorTerminationStateMachine);
+		assertTrue(secondNode.getStateMachine().receiveMessage(oneToTwo.getConnectionToAID()));
+		assertTrue(thirdNode.getStateMachine().receiveMessage(oneToThree.getConnectionToAID()));		
+		// second and third nodes are now in participant recovery mode
+		assertTrue(secondNode.getStateMachine() instanceof ParticipantStateMachine);
+		assertTrue(thirdNode.getStateMachine() instanceof ParticipantStateMachine);
+		// second node sends precommit to first node
+		assertTrue(firstNode.getStateMachine().receiveMessage(oneToTwo.getConnectionToBID()));
+		// third node sends precommit to first node
+		assertTrue(firstNode.getStateMachine().receiveMessage(oneToThree.getConnectionToBID()));
+		// first node commits; sends commit to transaction manager, second and third nodes
+		Message lastToSecond = getLastMessageInQueue(oneToTwo.getConnectionToBID().getOutQueue());
+		assertEquals(Command.COMMIT, lastToSecond.getCommand());
+		Message lastToThird = getLastMessageInQueue(oneToTwo.getConnectionToBID().getOutQueue());
+		assertEquals(Command.COMMIT, lastToThird.getCommand());
+		fail("todo: check message to txn manager");
 	}
 }

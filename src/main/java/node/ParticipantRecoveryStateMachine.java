@@ -2,6 +2,7 @@ package node;
 
 import messages.DecisionRequest;
 import messages.DelayMessage;
+import messages.ElectedMessage;
 import messages.InRecoveryResponse;
 import messages.Message;
 import messages.vote_req.VoteRequest;
@@ -13,6 +14,7 @@ import util.Common;
 import java.io.EOFException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -124,8 +126,13 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 				}
 				else {
 					// all peers are in recovery, so see if we can elect a leader.
-					// TODO
-					throw new RuntimeException();
+					if (upSetIntersection.stream().allMatch(u -> recoveredProcesses.contains(u))) {
+						ownerNode.startElectionProtocol();					        
+					}
+					else {
+						// the last process to fail hasn't recovered yet, so rewind
+						advanceToNextProcessOrRewind();
+					}
 				}
 			}
 			else if (state == ParticipantRecoveryState.SomeProcessesUncertain) {
