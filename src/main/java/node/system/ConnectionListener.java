@@ -16,8 +16,9 @@ public class ConnectionListener implements Runnable {
     }
 
     @Override public void run() {
-        while (true) {
+        while (connection.isReady()) {
             receiver.receiveMessageFrom(connection, msgsRcvd++);
         }
+        System.out.println("Closing connection to "+connection.getReceiverID());
     }
 }

@@ -214,5 +214,4 @@ public class AsynchronousSystemTest extends TestCommon {
         system.killAllNodes();
     }
 
-    
 }

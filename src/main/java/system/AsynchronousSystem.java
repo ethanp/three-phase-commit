@@ -91,4 +91,8 @@ public class AsynchronousSystem extends DistributedSystem {
     public AsyncTxnMgr getTxnMgr() {
         return txnMgr;
     }
+
+    public static void main(String[] args) {
+        new AsynchronousSystem(args.length > 0 ? Integer.parseInt(args[0]) : 5);
+    }
 }
