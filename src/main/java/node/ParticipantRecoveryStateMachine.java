@@ -2,12 +2,10 @@ package node;
 
 import messages.DecisionRequest;
 import messages.DelayMessage;
-import messages.ElectedMessage;
 import messages.InRecoveryResponse;
 import messages.Message;
-import messages.UncertainResponse;
-import messages.YesResponse;
 import messages.Message.Command;
+import messages.UncertainResponse;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
@@ -15,15 +13,11 @@ import system.network.Connection;
 import util.Common;
 
 import java.io.EOFException;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-
-import javax.swing.OverlayLayout;
 
 public class ParticipantRecoveryStateMachine extends StateMachine {
 	private enum ParticipantRecoveryState {
@@ -95,7 +89,7 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
         else {
         	recoveredProcesses.remove(receiverID);
         }
-        
+
 		switch (message.getCommand()) {
 		case COMMIT:
 			if (state == ParticipantRecoveryState.NoInformation) {
@@ -152,7 +146,7 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 					}
 					if (ready) {
 						updateNodeUpSet();
-						ownerNode.electNewLeader(uncommitted, false);					        
+						ownerNode.electNewLeader(uncommitted, false);
 					}
 					else {
 						// the last process to fail hasn't recovered yet, so rewind
@@ -175,7 +169,7 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 			break;
 		case UR_ELECTED:
 			updateNodeUpSet();
-			ownerNode.becomeCoordinatorInRecovery(uncommitted);			
+			ownerNode.becomeCoordinatorInRecovery(uncommitted);
 			break;
         /* Fail Cases */
         case PARTIAL_BROADCAST:
@@ -200,7 +194,7 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 				.collect(Collectors.toList());
 		ownerNode.setUpSet(nodeUpSet);
 	}
-	
+
 	private void resetToNoInformation() {
 		state = ParticipantRecoveryState.NoInformation;
 		currentPeerIndex = 0;
@@ -214,6 +208,8 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 
 	private void sendDecisionRequestToCurrentPeer() {
 		PeerReference current = sortedPeers.get(currentPeerIndex);
+        // TODO does this make sense?
+        if (current == null) return;
         Connection currentPeerConnection = ownerNode.isConnectedTo(current)
                 ? ownerNode.getPeerConnForId(current.nodeID)
                 : ownerNode.connectTo(current);

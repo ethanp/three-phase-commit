@@ -33,6 +33,7 @@ public class AsyncTxnMgr extends TransactionManager {
         coordinatorChosen.signalAll();
         nodesConnected.unlock();
         console = new CommandConsole(this);
+        new Thread(console).start();
     }
 
     private void waitForAllNodesToConnect() {

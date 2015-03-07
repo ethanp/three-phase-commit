@@ -29,7 +29,10 @@ public class AsyncProcessNode extends Node {
     AsyncProcessNode(int systemListenPort, int myNodeID) {
         super(myNodeID);
         dtLog = new FileDTLog(new File(Common.LOG_DIR, String.valueOf(myNodeID)), this);
-        System.out.println(getMyNodeID()+": log on startup: "+dtLog.getLogAsString());
+
+        System.out.println("Node "+getMyNodeID()+": log on startup:");
+        System.out.println(dtLog.getLogAsString());
+
         recoverFromDtLog();
 
         /* start local server */
@@ -60,8 +63,13 @@ public class AsyncProcessNode extends Node {
 
     @Override public void addConnection(Connection connection) {
         super.addConnection(connection);
-        L.OG("connected to "+connection.getReceiverID());
-        new Thread(new ConnectionListener(this, (ObjectConnection)connection)).start();
+        if (connection == null) {
+            System.err.println("Connection is null");
+        }
+        else {
+            L.OG("connected to "+connection.getReceiverID());
+            new Thread(new ConnectionListener(this, (ObjectConnection) connection)).start();
+        }
     }
 
     /**
@@ -76,6 +84,7 @@ public class AsyncProcessNode extends Node {
      */
     @Override public Connection connectTo(PeerReference peerReference) {
         try {
+            L.OG("Connecting to "+peerReference.getNodeID());
             final ObjectConnection connection = new ObjectConnection(
                     new Socket(LOCALHOST, peerReference.getListeningPort()),
                     peerReference.getNodeID());
@@ -117,16 +126,16 @@ public class AsyncProcessNode extends Node {
                         Message msg = connection.receiveMessage();
                         if (msg instanceof NodeMessage) {
                             connection.setReceiverID(((NodeMessage) msg).getNodeID());
-
+                            addConnection(connection);
                         }
                         else {
-                            L.OG("Conn didn't receive node msg");
+                            L.OG("Conn didn't receive node msg, connection failed");
+                            connection.socket.close();
                         }
                     }
                     catch (EOFException e) {
                         L.OG("New conn received EOF");
                     }
-                    addConnection(connection);
                 }
                 catch (IOException e) {
                     e.printStackTrace();
@@ -137,6 +146,7 @@ public class AsyncProcessNode extends Node {
 
     public static void main(String[] args) throws IOException {
         int nodeID = args.length > 0 ? Integer.parseInt(args[0]) : 55;
+        Common.ASYNC_NODE_ID = nodeID;
         int systemListenPort = args.length > 1 ? Integer.parseInt(args[1]) : 3000;
         System.out.println("Node "+nodeID+" booting in its own process");
         AsyncProcessNode node = new AsyncProcessNode(systemListenPort, nodeID);

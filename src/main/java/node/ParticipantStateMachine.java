@@ -35,7 +35,7 @@ import static util.Common.NO_ONGOING_TRANSACTION;
  */
 public class ParticipantStateMachine extends StateMachine {
 
-	
+
     /* REFERENCES */
     final Node node;
 
@@ -53,7 +53,7 @@ public class ParticipantStateMachine extends StateMachine {
     	machine.precommitted = precommit;
     	return machine;
     }
-    
+
     public ParticipantStateMachine(Node node) {
         this.node = node;
     }
@@ -138,14 +138,14 @@ public class ParticipantStateMachine extends StateMachine {
                 	}
                 	else if (lastLogged instanceof AbortRequest || lastLogged instanceof CommitRequest) {
                 		m = lastLogged;
-                	}                	
+                	}
                 	else {
                 		m = precommitted ? new PrecommitRequest(ongoingTransactionID) : new UncertainResponse(action.getTransactionID());
                 	}
                 	overConnection.sendMessage(m);
                 	node.resetTimersFor(overConnection.getReceiverID());
                 	break;
-                	
+
                 /* SET FAIL-CASE OR DELAY */
                 case PARTIAL_BROADCAST:
                 case DEATH_AFTER:
@@ -164,12 +164,12 @@ public class ParticipantStateMachine extends StateMachine {
 
         return true;
     }
-    
+
     Message lastLoggedMessage() {
     	List<Message> loggedMessages = node.getDtLog().getLoggedMessages().stream().collect(Collectors.toList());
 		int s = loggedMessages.size();
 		return s > 0 ? loggedMessages.get(s - 1) : null;
-	}    
+	}
 
     private void receiveUR_ELECTED(Message message) {
 
