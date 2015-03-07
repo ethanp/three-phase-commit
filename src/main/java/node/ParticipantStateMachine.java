@@ -53,7 +53,8 @@ public class ParticipantStateMachine extends StateMachine {
 
         try { msg = currentConnection.receiveMessage(); }
         catch (EOFException e) {
-            System.err.println("Node "+node.getMyNodeID()+" received EOFException");
+            System.err.println("Node "+node.getMyNodeID()+" received EOFException from "+overConnection.getReceiverID());
+            System.exit(Common.EXIT_FAILURE);
             msg = null;
         }
 

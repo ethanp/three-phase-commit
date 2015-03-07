@@ -74,6 +74,10 @@ public abstract class Node implements MessageReceiver {
         this.dtLog = dtLog;
     }
 
+    public void log(String s) {
+        System.out.println(getMyNodeID()+": "+s);
+    }
+
     public void recoverFromDtLog() {
     	LogRecoveryStateMachine recoveryMachine = new LogRecoveryStateMachine(this);
     	VoteRequest uncommitted = recoveryMachine.getUncommittedRequest();
@@ -167,10 +171,12 @@ public abstract class Node implements MessageReceiver {
     }
 
     @Override public boolean receiveMessageFrom(Connection connection, int msgsRcvd) {
+        final int otherEnd = connection.getReceiverID();
         if (deathAfter != null
-            && deathAfter.getFromProc() == connection.getReceiverID()
-            && deathAfter.getNumMsgs() >= msgsRcvd)
+            && deathAfter.getFromProc() == otherEnd
+            && msgsRcvd >= deathAfter.getNumMsgs())
         {
+            System.out.println(getMyNodeID()+" received too many messages from "+otherEnd);
             selfDestruct();
         }
         return stateMachine.receiveMessage(connection);

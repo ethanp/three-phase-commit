@@ -11,7 +11,7 @@ import java.io.File;
  * Ethan Petuchowski 3/2/15
  */
 public class AsynchronousSystem extends DistributedSystem {
-    final AsyncTxnMgr txnMgr;
+    protected final AsyncTxnMgr txnMgr;
 
     public AsynchronousSystem(int numNodes) {
         clearLogs();
@@ -86,5 +86,9 @@ public class AsynchronousSystem extends DistributedSystem {
 
     void killNode(int nodeID) {
         txnMgr.getNodeByID(nodeID).killNode();
+    }
+
+    public AsyncTxnMgr getTxnMgr() {
+        return txnMgr;
     }
 }

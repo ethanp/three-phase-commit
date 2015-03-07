@@ -3,6 +3,7 @@ package system;
 import messages.Message;
 import node.PeerReference;
 import system.network.Connection;
+import util.Common;
 
 import java.io.EOFException;
 
@@ -47,7 +48,8 @@ public class ManagerNodeRef {
             return getConn().receiveMessage();
         }
         catch (EOFException ignored) {
-            System.err.println("NodeRef "+getNodeID()+" received EOFException");
+            System.err.println("NodeRef "+getNodeID()+" received EOFException from "+getConn().getReceiverID());
+            System.exit(Common.EXIT_FAILURE);
             return null;
         }
     }
