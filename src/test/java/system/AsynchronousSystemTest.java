@@ -220,10 +220,60 @@ public class AsynchronousSystemTest extends TestCommon {
         system.killAllNodes();
     }
 
-    @Ignore
+    @Test
     public void testCoordinatorFailsAfterSendingPrecommitToAll() throws Exception {
-        String cmdStr = "add a_song a_url -partialPrecommit ";
 
+        /* what SHOULD happen
+
+            TxnMgr
+                sends AddReq to Coord
+            C1
+                broadcasts AddReq to all
+            P2-5
+                send YES to Coord
+            C1
+                sends PRE_CMT to 2,3
+                fails
+            P4,5
+                Timeout on response from Coord
+                send UR_EL to 2
+            P2
+                receives UR_EL
+                becomes Coordinator in Term-Protocol
+            C2
+                sends STATE_REQ to 3-5
+            P3
+                receive STATE_REQ
+                sends PRE_CMT
+            P4-5
+                receive STATE_REQ
+                send Uncertain
+            C2
+                send PRE_CMT to 4-5
+                wait for ACKS
+            P4-5
+                receive PRE_CMT
+                send ACK
+            C2
+                receive ACKS
+                broadcast COMMIT
+            R1
+                send DEC_REQ to 2
+            C2
+                sends COMMIT to 1
+
+            We need to adjust P->C so that C gets whether P was precommitted
+         */
+
+        String cmdStr = "add a_song a_url -partialPrecommit 2 1";
+        ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
+        assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
+
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);
+        for (int i = 1; i <= 5; i++) {
+            assertLogContains(i, COMMIT, TXID);
+        }
+        system.killAllNodes();
     }
 
     private void assertLogContains(int nodeID, Message.Command command, int txid) throws IOException {

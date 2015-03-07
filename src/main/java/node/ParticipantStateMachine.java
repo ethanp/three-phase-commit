@@ -85,9 +85,11 @@ public class ParticipantStateMachine extends StateMachine {
                 case DELETE:
                 case PRE_COMMIT:
                     node.resetTimersFor(currentConnection.getReceiverID());
+                    break;
                 case ABORT:
                 case COMMIT:
                     node.cancelTimersFor(currentConnection.getReceiverID());
+                    break;
             }
 
             switch (msg.getCommand()) {
@@ -169,10 +171,10 @@ public class ParticipantStateMachine extends StateMachine {
 	}
 
     private void receiveUR_ELECTED(Message message) {
-
-        // TODO we can remove members of UP-set with peerID < myPeerID
-
-        node.becomeCoordinatorInRecovery(action);
+        for (int i = 1; i < node.getMyNodeID(); i++) {
+            removeFromUpset(i);
+        }
+        node.becomeCoordinatorInRecovery(action, precommitted);
     }
 
     private void receiveAbort(Message message) {
@@ -234,6 +236,7 @@ public class ParticipantStateMachine extends StateMachine {
         setOngoingTransactionID(voteRequest.getTransactionID());
         setPeerSet(voteRequest.getCloneOfPeerSet());
         node.setUpSet(voteRequest.getCloneOfPeerSet());
+        node.resetTimersFor(currentConnection.getReceiverID());
         logAndSendMessage(new YesResponse(voteRequest));
     }
 

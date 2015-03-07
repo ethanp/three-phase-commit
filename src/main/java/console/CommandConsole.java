@@ -19,7 +19,7 @@ public class CommandConsole implements Runnable {
     }
 
     @Override public void run() {
-        while (true) {
+        while (sc.hasNextLine()) {
             String cmdStr = sc.nextLine();
             ConsoleCommand cmd = new ConsoleCommand(cmdStr, ++transactionID);
             transactionManager.processCommand(cmd);

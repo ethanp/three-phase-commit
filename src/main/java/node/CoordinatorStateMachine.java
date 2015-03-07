@@ -11,6 +11,7 @@ import messages.UncertainResponse;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
+import system.failures.PartialBroadcast;
 import system.network.Connection;
 import util.Common;
 
@@ -44,12 +45,19 @@ public class CoordinatorStateMachine extends StateMachine {
 	private int uncertainStates;
 	private int precommits;
 
-	public static CoordinatorStateMachine startInTerminationProtocol(Node ownerNode, VoteRequest action) {
+	public static CoordinatorStateMachine startInTerminationProtocol(Node ownerNode, VoteRequest action, boolean precommitted) {
 		CoordinatorStateMachine machine = new CoordinatorStateMachine(ownerNode);
 		machine.action = action;
 		machine.ongoingTransactionID = action.getTransactionID();
 		machine.state = CoordinatorState.WaitingForStates;
-		machine.uncertainStates = 1;
+        machine.setPeerSet(action.getPeerSet());
+        machine.acks = 1;
+        if (precommitted) {
+            machine.precommits = 1;
+        }
+        else {
+            machine.uncertainStates = 1;
+        }
 		Collection<PeerReference> notMe = ownerNode.getUpSet().stream().filter(pr -> pr.getNodeID() != ownerNode.getMyNodeID()).collect(Collectors.toList());
 		machine.setupTransactionConnectionsAndSendMessage(new StateRequest(machine.ongoingTransactionID), notMe);
 		return machine;
@@ -172,7 +180,6 @@ public class CoordinatorStateMachine extends StateMachine {
                 		throw new RuntimeException("Received PRE_COMMIT when not expecting one");
                 	}
                 	break;
-                // TODO decision request
                 case DECISION_REQUEST:
                     /* reply with most-recent decision */
                     if (state == CoordinatorState.WaitingForCommand) {
@@ -306,6 +313,9 @@ public class CoordinatorStateMachine extends StateMachine {
     		}
     		else {
     			precommitCurrentAction();
+
+                // shallow copy upset into peer set
+                setPeerSet(upSet.stream().map(d->d).collect(Collectors.toList()));
     		}
     	}
     }
@@ -324,21 +334,40 @@ public class CoordinatorStateMachine extends StateMachine {
 		}
     }
 
+    private int partialBroadcastCount(Message.Command stage) {
+        final PartialBroadcast ptlBrdcst = ownerNode.getPartialBroadcast();
+        int limit = 1000;
+        if (ptlBrdcst != null && ptlBrdcst.getStage() == stage) {
+            limit = ptlBrdcst.getCountProcs();
+        }
+        return limit;
+    }
+
     private void precommitCurrentAction() {
-		PrecommitRequest precommit = new PrecommitRequest(ongoingTransactionID);
-		for (Connection connection : txnConnections) {
-            ownerNode.resetTimersFor(connection.getReceiverID());
-            ownerNode.send(connection, precommit);
-		}
+        PrecommitRequest precommit = new PrecommitRequest(ongoingTransactionID);
+        broadcast(precommit);
+        txnConnections.forEach(conn -> ownerNode.resetTimersFor(conn.getReceiverID()));
 		state = CoordinatorState.WaitingForAcks;
+    }
+
+    private void broadcast(Message message) {
+        int limit = partialBroadcastCount(message.getCommand());
+        int i = 0;
+        for (Connection connection : txnConnections) {
+            if (i++ >= limit) {
+                ownerNode.selfDestruct();
+            }
+            ownerNode.send(connection, message);
+        }
+        if (i == limit) {
+            ownerNode.selfDestruct();
+        }
     }
 
     private void commitCurrentAction() {
 		CommitRequest commit = new CommitRequest(ongoingTransactionID);
 		ownerNode.logMessage(commit);
-        for (Connection connection : txnConnections) {
-            ownerNode.send(connection, commit);
-		}
+        broadcast(commit);
         ownerNode.sendTxnMgrMsg(commit);
         ownerNode.applyActionToVolatileStorage(action);
         resetToWaiting();

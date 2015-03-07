@@ -100,7 +100,7 @@ public class AsyncProcessNode extends Node {
         }
     }
 
-    @Override protected void selfDestruct() {
+    @Override public void selfDestruct() {
         System.err.println("Node "+getMyNodeID()+" self destructing!");
         System.exit(Common.EXIT_SUCCESS);
     }

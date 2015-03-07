@@ -174,7 +174,7 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
                     break;
                 case UR_ELECTED:
                     updateNodeUpSet();
-                    ownerNode.becomeCoordinatorInRecovery(uncommitted);
+                    ownerNode.becomeCoordinatorInRecovery(uncommitted, false);
                     break;
                 /* Fail Cases */
                 case PARTIAL_BROADCAST:

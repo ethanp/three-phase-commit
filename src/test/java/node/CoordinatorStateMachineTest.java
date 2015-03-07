@@ -8,12 +8,10 @@ import messages.Message;
 import messages.NoResponse;
 import messages.PeerTimeout;
 import messages.YesResponse;
-import messages.Message.Command;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
-import node.CoordinatorStateMachine.CoordinatorState;
 import node.system.SyncNode;
 
 import org.junit.Before;
@@ -130,7 +128,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
     }
 
     private void startInTerminationProtocol(VoteRequest action) {
-    	syncNode.becomeCoordinatorInRecovery(action);
+    	syncNode.becomeCoordinatorInRecovery(action, false);
     	csm = (CoordinatorStateMachine)syncNode.getStateMachine();
     }
 

@@ -189,8 +189,8 @@ public abstract class Node implements MessageReceiver {
         stateMachine = CoordinatorStateMachine.startInNormalMode(this);
     }
 
-    public void becomeCoordinatorInRecovery(VoteRequest ongoingAction) {
-    	stateMachine = CoordinatorStateMachine.startInTerminationProtocol(this, ongoingAction);
+    public void becomeCoordinatorInRecovery(VoteRequest ongoingAction, boolean precommitted) {
+    	stateMachine = CoordinatorStateMachine.startInTerminationProtocol(this, ongoingAction, precommitted);
     }
 
     public void becomeParticipant() {
@@ -262,12 +262,13 @@ public abstract class Node implements MessageReceiver {
     public void electNewLeader(VoteRequest ongoingAction, boolean precommitted) {
     	PeerReference newCoordinator = upSet.stream().min((a, b) -> a.compareTo(b)).get();
     	if (newCoordinator.getNodeID() == myNodeID) {
-    		becomeCoordinatorInRecovery(ongoingAction);
+    		becomeCoordinatorInRecovery(ongoingAction, precommitted);
     	}
     	else {
     		getOrConnectToPeer(newCoordinator).sendMessage(new ElectedMessage(ongoingAction.getTransactionID()));
     		resetTimersFor(newCoordinator.getNodeID());
     		stateMachine = ParticipantStateMachine.startInTerminationProtocol(this, ongoingAction, precommitted);
+            ((ParticipantStateMachine)stateMachine).setCoordinatorID(newCoordinator.getNodeID());
     	}
     }
 
@@ -304,7 +305,7 @@ public abstract class Node implements MessageReceiver {
         sendTxnMgrMsg(request);
     }
 
-    protected abstract void selfDestruct();
+    public abstract void selfDestruct();
 
     public Message getDecisionFor(int transactionID) {
         List<Message> messages = new ArrayList<>(getDtLog().getLoggedMessages());
@@ -314,6 +315,10 @@ public abstract class Node implements MessageReceiver {
                                     && m.getCommand().isDecision())
                        .findFirst()
                        .orElse(null);
+    }
+
+    public PartialBroadcast getPartialBroadcast() {
+        return partialBroadcast;
     }
 
     private class TimeoutMonitor {
