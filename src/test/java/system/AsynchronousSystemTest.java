@@ -205,45 +205,7 @@ public class AsynchronousSystemTest extends TestCommon {
 
     @Test
     public void testParticipantFailsAfterSendingYES() throws Exception {
-        /*
-            TxnMgr
-                creates nodes
-                dubs 1 coordinator
 
-            Coordinator
-                receives add request with 2's listen port
-                connects to node 2, and sends vital stats
-
-            Node 2
-                saves Coord's vital stats
-                listens for messages
-
-            Coordinator
-                sends ADD to 2
-
-            Node 2
-                receives ADD
-                logs request
-                CRASHES.
-
-            Coordinator
-                times-out on 2
-                tells TxnMgr 2 is dead
-                ABORTS transaction
-
-            TxnMgr
-                receives "2 is dead" from Coord
-                restarts 2
-                receives ABORT, relays to System
-
-            Node 2
-                revives from it's log: nothing logged
-
-            System
-                receives ABORT
-                kills all nodes
-
-        */
         String cmdStr = "add a_song a_url -deathAfter 1 1 2";
         ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
         assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
@@ -252,5 +214,4 @@ public class AsynchronousSystemTest extends TestCommon {
         system.killAllNodes();
     }
 
-    
 }

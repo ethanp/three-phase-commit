@@ -79,8 +79,13 @@ public class TxnMgrServer implements Runnable, MessageReceiver {
     @Override public boolean receiveMessageFrom(Connection connection, int msgsRcvd) {
         try {
             final Message message = connection.receiveMessage();
-            System.out.println("mgr rcvd a "+message.getCommand()+" from node "+connection.getReceiverID());
-            txnMgr.receiveResponse(message);
+            if (message == null) {
+                System.err.println("TxnMgrServer received a null message from "+connection.getReceiverID());
+            }
+            else {
+                System.out.println("mgr rcvd a "+message.getCommand()+" from node "+connection.getReceiverID());
+                txnMgr.receiveResponse(message);
+            }
         }
         catch (EOFException ignore) {
 //            System.err.println("TxnMgr received EOFException from "+connection.getReceiverID());

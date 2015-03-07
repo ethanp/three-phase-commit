@@ -1,11 +1,11 @@
 package messages;
 
-public class DecisionRequest extends Message {
+public class StateRequest extends Message {
 
-	public DecisionRequest(int transactionId) {
-		super(Command.DECISION_REQUEST, transactionId);
+	public StateRequest(int transactionId) {
+		super(Command.STATE_REQUEST, transactionId);
 	}
-
+	
 	@Override
 	protected void writeAsTokens(TokenWriter writer) {
 		// TODO Auto-generated method stub

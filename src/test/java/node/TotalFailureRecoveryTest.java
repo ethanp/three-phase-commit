@@ -4,32 +4,43 @@ import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.Collection;
+
+import messages.Message;
 import messages.PeerTimeout;
 import messages.YesResponse;
+import messages.Message.Command;
 import messages.vote_req.AddRequest;
 import node.system.SyncNode;
+
 import org.junit.Before;
 import org.junit.Test;
+
+import system.network.QueueConnection;
 import system.network.QueueSocket;
+import util.Common;
 import util.SongTuple;
 import util.TestCommon;
 
 public class TotalFailureRecoveryTest extends TestCommon {
 	
     SyncNode[] nodesUnderTest;
-    QueueSocket queueSocket;
     QueueSocket[] peerQueueSockets;
     ArrayList<PeerReference> peerReferences;
     SongTuple songTuple;
     ParticipantRecoveryStateMachine prsm;
-    
+    QueueSocket txnMgrQueueSocket;
+    QueueConnection txnMgrToCoordinator;
+    QueueConnection coordinatorToTxnMgr;
+
     @Before
     public void setUp() throws Exception {
         nodesUnderTest = new SyncNode[3]; 
         peerReferences = new ArrayList<PeerReference>();
+        txnMgrQueueSocket = new QueueSocket(1, Common.TXN_MGR_ID);
+        coordinatorToTxnMgr = txnMgrQueueSocket.getConnectionToBID();
         for (int i = 0; i < 3; ++i) {
         	final int peerId = i + 1;
-        	nodesUnderTest[i] = new SyncNode(peerId, null);	
+        	nodesUnderTest[i] = new SyncNode(peerId, i == 0 ? coordinatorToTxnMgr : null);	
             peerReferences.add(new PeerReference(peerId, 0));
         }
                
@@ -57,7 +68,7 @@ public class TotalFailureRecoveryTest extends TestCommon {
 		// first node "connects" to second and third, but they're not up yet 
 		firstNode.addConnection(oneToTwo.getConnectionToBID());
 		firstNode.addConnection(oneToThree.getConnectionToBID());        
-
+		
 		firstNode.setDtLog(stubNode.getDtLog());
 		firstNode.recoverFromDtLog();
 		ParticipantRecoveryStateMachine firstSM = (ParticipantRecoveryStateMachine)firstNode.getStateMachine();
@@ -104,9 +115,11 @@ public class TotalFailureRecoveryTest extends TestCommon {
 		assertTrue(secondRecoveredSet.contains(1));
 		assertTrue(secondRecoveredSet.contains(2));		
         // second node sends decision_req to third node, which times out
-        twoToThree.getConnectionToBID().getInQueue().clear();	// remove the message so it isn't received later
+        twoToThree.getConnectionToBID().getOutQueue().clear();	// remove the message so it isn't received later
         twoToThree.getConnectionToAID().sendMessage(new PeerTimeout(3));
 		assertTrue(secondNode.getStateMachine().receiveMessage(twoToThree.getConnectionToBID()));
+		// second node sends decision_req to first node
+		oneToTwo.getConnectionToAID().getOutQueue().clear();	// remove the message so it isn't received later		
         // second node is now waiting for a coordinator; check its up set
 		Collection<Integer> secondUpSetIntersection = secondSM.getUpSetIntersection();
 		assertEquals(2, secondUpSetIntersection.size());
@@ -133,8 +146,28 @@ public class TotalFailureRecoveryTest extends TestCommon {
 		assertTrue(secondNode.getStateMachine().receiveMessage(twoToThree.getConnectionToBID()));
 		assertTrue(thirdNode.getStateMachine().receiveMessage(twoToThree.getConnectionToAID()));
         // third node now sends ur_elected to first node, and changes to participant recovery state
-		fail("todo");
+		assertTrue(firstNode.getStateMachine().receiveMessage(oneToThree.getConnectionToBID()));
 		// first node is now in coordinator termination protocol, and sends state_request to second and third nodes
-		// second node is still waiting for a coordinator
+		assertTrue(firstNode.getStateMachine() instanceof CoordinatorStateMachine);
+		assertTrue(secondNode.getStateMachine().receiveMessage(oneToTwo.getConnectionToAID()));
+		assertTrue(thirdNode.getStateMachine().receiveMessage(oneToThree.getConnectionToAID()));		
+		// second and third nodes are now in participant recovery mode
+		assertTrue(secondNode.getStateMachine() instanceof ParticipantStateMachine);
+		assertTrue(thirdNode.getStateMachine() instanceof ParticipantStateMachine);
+		// second node sends Yes to first node
+		assertTrue(firstNode.getStateMachine().receiveMessage(oneToTwo.getConnectionToBID()));
+		// third node sends Yes to first node
+		assertTrue(firstNode.getStateMachine().receiveMessage(oneToThree.getConnectionToBID()));
+		// first node aborts; sends abort to transaction manager, second and third nodes
+		Message lastToSecond = getLastMessageInQueue(oneToTwo.getConnectionToBID().getOutQueue());
+		assertEquals(Command.ABORT, lastToSecond.getCommand());
+		Message lastToThird = getLastMessageInQueue(oneToThree.getConnectionToBID().getOutQueue());
+		assertEquals(Command.ABORT, lastToThird.getCommand());
+		Message lastToTxnMgr = getLastMessageInQueue(coordinatorToTxnMgr.getOutQueue());
+		assertEquals(Command.ABORT, lastToTxnMgr.getCommand());
 	}
+	
+	// test that if coordinator in term. protocol receives abort, decide abort
+	// test that if receives commit, decide commit
+	// test that if some process sends committable and nobody has committed, then we go through precommit rigmarole
 }

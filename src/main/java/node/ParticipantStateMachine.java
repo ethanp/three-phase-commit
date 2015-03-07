@@ -8,6 +8,7 @@ import messages.Message;
 import messages.NoResponse;
 import messages.PeerTimeout;
 import messages.PrecommitRequest;
+import messages.UncertainResponse;
 import messages.YesResponse;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
@@ -21,7 +22,10 @@ import util.Common;
 
 import java.io.EOFException;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.PriorityQueue;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 import static util.Common.NO_ONGOING_TRANSACTION;
@@ -31,16 +35,24 @@ import static util.Common.NO_ONGOING_TRANSACTION;
  */
 public class ParticipantStateMachine extends StateMachine {
 
+
     /* REFERENCES */
     final Node node;
 
     /* ONGOING TRANSACTION ATTRIBUTES */
     private int ongoingTransactionID = NO_ONGOING_TRANSACTION;
     private VoteRequest action;  // the update being performed
-    private Collection<PeerReference> upSet = null;
     private boolean precommitted = false;
     private Connection currentConnection = null;
     private int coordinatorId;
+
+    public static ParticipantStateMachine startInTerminationProtocol(Node ownerNode, VoteRequest action, boolean precommit) {
+    	ParticipantStateMachine machine = new ParticipantStateMachine(ownerNode);
+    	machine.action = action;
+    	machine.ongoingTransactionID = action.getTransactionID();
+    	machine.precommitted = precommit;
+    	return machine;
+    }
 
     public ParticipantStateMachine(Node node) {
         this.node = node;
@@ -111,7 +123,6 @@ public class ParticipantStateMachine extends StateMachine {
                 case DUB_COORDINATOR:
                     receiveDubCoordinator(msg);
                     break;
-
                 /* UH-OH */
                 case TIMEOUT:
                     onTimeout((PeerTimeout) msg);
@@ -120,6 +131,20 @@ public class ParticipantStateMachine extends StateMachine {
                 // TODO Decision-Request
                 case DECISION_REQUEST:
                     throw new NotImplementedException();
+                case STATE_REQUEST:
+                	Message m, lastLogged = lastLoggedMessage();
+                	if (lastLogged == null) {
+                		m = new AbortRequest(Common.NO_ONGOING_TRANSACTION);
+                	}
+                	else if (lastLogged instanceof AbortRequest || lastLogged instanceof CommitRequest) {
+                		m = lastLogged;
+                	}
+                	else {
+                		m = precommitted ? new PrecommitRequest(ongoingTransactionID) : new UncertainResponse(action.getTransactionID());
+                	}
+                	overConnection.sendMessage(m);
+                	node.resetTimersFor(overConnection.getReceiverID());
+                	break;
 
                 /* SET FAIL-CASE OR DELAY */
                 case PARTIAL_BROADCAST:
@@ -140,19 +165,24 @@ public class ParticipantStateMachine extends StateMachine {
         return true;
     }
 
+    Message lastLoggedMessage() {
+    	List<Message> loggedMessages = node.getDtLog().getLoggedMessages().stream().collect(Collectors.toList());
+		int s = loggedMessages.size();
+		return s > 0 ? loggedMessages.get(s - 1) : null;
+	}
+
     private void receiveUR_ELECTED(Message message) {
 
         // TODO we can remove members of UP-set with peerID < myPeerID
 
-        node.becomeCoordinator();
+        node.becomeCoordinatorInRecovery(action);
     }
 
     private void receiveAbort(Message message) {
         node.logMessage(message);
         action = null;
         setPeerSet(null);
-        setUpSet(null);
-        ongoingTransactionID = NO_ONGOING_TRANSACTION;
+        node.setUpSet(null);
     }
 
     private void receiveDubCoordinator(Message message) {
@@ -206,7 +236,7 @@ public class ParticipantStateMachine extends StateMachine {
         action = voteRequest;
         setOngoingTransactionID(voteRequest.getTransactionID());
         setPeerSet(voteRequest.getCloneOfPeerSet());
-        setUpSet(voteRequest.getCloneOfPeerSet());
+        node.setUpSet(voteRequest.getCloneOfPeerSet());
         logAndSendMessage(new YesResponse(voteRequest));
     }
 
@@ -237,14 +267,6 @@ public class ParticipantStateMachine extends StateMachine {
     	this.coordinatorId = coordinatorID;
     }
 
-    public Collection<PeerReference> getUpSet() {
-        return upSet;
-    }
-
-    public void setUpSet(Collection<PeerReference> upSet) {
-        this.upSet = upSet;
-    }
-
     public VoteRequest getAction() {
         return action;
     }
@@ -257,7 +279,7 @@ public class ParticipantStateMachine extends StateMachine {
     	if (timeout.getPeerId() == coordinatorId) {
 	    	node.logMessage(timeout);
 	        removeFromUpset(timeout.getPeerId());
-            node.startElectionProtocol();
+            node.electNewLeader(action, precommitted);
     	}
         else {
             throw new RuntimeException("timeout on node ["+timeout.getPeerId()+"] "+
@@ -266,12 +288,12 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     private PeerReference getNodeWithLowestIDInUpset() {
-        if (getUpSet().isEmpty()) return null;
-        PriorityQueue<PeerReference> peerReferences = new PriorityQueue<>(getUpSet());
+        if (node.getUpSet().isEmpty()) return null;
+        PriorityQueue<PeerReference> peerReferences = new PriorityQueue<>(node.getUpSet());
         return peerReferences.poll();
     }
 
     private void removeFromUpset(int id) {
-        upSet = upSet.stream().filter(c -> c.getNodeID() != id).collect(Collectors.toList());
+        node.setUpSet(node.getUpSet().stream().filter(c -> c.getNodeID() != id).collect(Collectors.toList()));
     }
 }
