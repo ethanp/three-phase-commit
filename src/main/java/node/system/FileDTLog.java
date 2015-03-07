@@ -12,16 +12,18 @@ import java.nio.file.Files;
  * Ethan Petuchowski 2/27/15
  */
 public class FileDTLog extends DTLog {
-    protected FileDTLog(File file, Node node) {
+    public FileDTLog(File file, Node node) {
         super(node);
         this.file = file;
         try {
-            if (!file.getParentFile().exists())
+            if (!file.getParentFile().exists()) {
                 file.getParentFile().mkdirs();
+            }
 
-            if (!file.exists())
+            if (!file.exists()) {
                 file.createNewFile();
-            writer = new FileWriter(file);
+            }
+            writer = new FileWriter(file, true);
         }
         catch (IOException e) {
             e.printStackTrace();

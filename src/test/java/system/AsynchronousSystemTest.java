@@ -13,7 +13,9 @@ import util.Common;
 import util.TestCommon;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -124,10 +126,10 @@ public class AsynchronousSystemTest extends TestCommon {
 
     /* FAILURE CASES */
 
-    @Ignore
-    public void testCoordinatorFailsBeforeSendingVoteReq() throws Exception {
-
-    }
+    /**
+     * according to https://piazza.com/class/i5h1h4rqk9t4si?cid=47 we can ignore this case.
+     */
+    @Ignore public void testCoordinatorFailsBeforeSendingVoteReq() throws Exception {}
 
     @Test
     public void testParticipantFailsBeforeReceivingVoteReq() throws Exception {
@@ -160,7 +162,7 @@ public class AsynchronousSystemTest extends TestCommon {
                 revives from it's log: nothing logged
 
         */
-        String cmdStr = "add a_song a_url -deathAfter 1 1 2";
+        String cmdStr = "add a_song a_url -deathAfter 0 1 2";
         ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
         assertEquals(ABORT, system.processCommandToCompletion(command).getCommand());
 
@@ -168,68 +170,87 @@ public class AsynchronousSystemTest extends TestCommon {
         system.killAllNodes();
     }
 
-    @Ignore
-    public void testCoordinatorFailsAfterSendingAllVoteReqs() throws Exception {
+    @Test
+    public void testParticipantFailsAfterSendingNO_txnCommits() throws Exception {
+        /* this is already implementable
 
+            Start up the system (happens in @Before)
+            Put a COMMIT of the song in the log of node "2"
+            Have the system "restart" node 2
+                Now it ought to read the commit from the log on startup
+
+            [2 2015-03-06T22:46:43.773Z] ADD  1  5  1  3006  2  3002  3  3001  4  3003  5  3004  a_song  a_url
+            [2 2015-03-06T22:46:43.780Z] YES  1
+            [2 2015-03-06T22:46:44.797Z] COMMIT  1
+
+        */
+
+        final File logFile2 = new File("logDir", "2");
+        PrintWriter p = new PrintWriter(new FileWriter(logFile2));
+        p.println("[2 2015-03-06T22:46:43.773Z] ADD  1  5  1  3006  2  3002  3  3001  4  3003  5  3004  a_song  a_url");
+        p.println("[2 2015-03-06T22:46:43.780Z] YES  1");
+        p.println("[2 2015-03-06T22:46:44.797Z] COMMIT  1");
+        p.flush();
+
+        system.getTxnMgr().restartNodeWithID(2);
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS);
+
+        String cmdStr = "add a_song a_url -deathAfter 1 1 2";
+        ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
+        assertEquals(ABORT, system.processCommandToCompletion(command).getCommand());
+
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);
+        system.killAllNodes();
     }
 
-    @Ignore
-    public void testCoordinatorFailsAfterSendingSomeVoteReqs() throws Exception {
-
-    }
-
-    @Ignore
-    public void testParticipantFailsAfterReceivingVoteReq() throws Exception {
-
-    }
-
-    @Ignore
-    public void testParticipantFailsAfterLoggingNOBeforeSendingNO() throws Exception {
-
-    }
-
-    @Ignore
-    public void testParticipantFailsAfterLoggingYESBeforeSendingYES() throws Exception {
-
-    }
-
-    @Ignore
-    public void testParticipantFailsAfterSendingNO() throws Exception {
-
-    }
-
-    @Ignore
+    @Test
     public void testParticipantFailsAfterSendingYES() throws Exception {
+        /*
+            TxnMgr
+                creates nodes
+                dubs 1 coordinator
 
+            Coordinator
+                receives add request with 2's listen port
+                connects to node 2, and sends vital stats
+
+            Node 2
+                saves Coord's vital stats
+                listens for messages
+
+            Coordinator
+                sends ADD to 2
+
+            Node 2
+                receives ADD
+                logs request
+                CRASHES.
+
+            Coordinator
+                times-out on 2
+                tells TxnMgr 2 is dead
+                ABORTS transaction
+
+            TxnMgr
+                receives "2 is dead" from Coord
+                restarts 2
+                receives ABORT, relays to System
+
+            Node 2
+                revives from it's log: nothing logged
+
+            System
+                receives ABORT
+                kills all nodes
+
+        */
+        String cmdStr = "add a_song a_url -deathAfter 1 1 2";
+        ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
+        assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
+
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);
+        system.killAllNodes();
     }
 
-    @Ignore
-    public void testCoordinatorFailsAfterReceivingNOBeforeSendingAbort() throws Exception {
-
-    }
-
-    @Ignore
-    public void testCoordinatorFailsAfterSendingAbortToEveryone() throws Exception {
-
-    }
-
-    @Ignore
-    public void testCoordinatorFailsAfterSendingAbortToOnlySome() throws Exception {
-
-    }
-
-    @Ignore
-    public void testCoordinatorFailsAfterReceivingYESesBeforeSendingPrecommit() throws Exception {
-
-    }
-
-    @Ignore
-    public void testCoordinatorFailsAfterSendingPrecommitToEveryone() throws Exception {
-
-    }
-
-    @Ignore
-    public void testCoordinatorFailsAfterSendingPrecommitToOnlySome() throws Exception {
-
-    }
+    
 }

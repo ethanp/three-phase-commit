@@ -59,7 +59,8 @@ public class LogRecoveryStateMachine {
 			break;
 		case COMMIT:
 			if (currentRequest != null) {
-				node.commitAction(currentRequest);
+                System.out.println(node.getMyNodeID()+": recovered "+currentRequest.getCommand());
+                node.commitAction(currentRequest);
 				currentRequest = null;
 			}
 			else
