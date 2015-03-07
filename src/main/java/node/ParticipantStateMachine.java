@@ -20,7 +20,6 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.network.Connection;
 import util.Common;
 
-import java.io.EOFException;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
@@ -31,10 +30,6 @@ import static util.Common.NO_ONGOING_TRANSACTION;
  * Ethan Petuchowski 2/27/15
  */
 public class ParticipantStateMachine extends StateMachine {
-
-
-    /* REFERENCES */
-    final Node node;
 
     /* ONGOING TRANSACTION ATTRIBUTES */
     private int ongoingTransactionID = NO_ONGOING_TRANSACTION;
@@ -52,31 +47,17 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     public ParticipantStateMachine(Node node) {
-        this.node = node;
+        super(node);
     }
 
-    @Override public boolean receiveMessage(Connection overConnection) {
+    @Override public boolean receiveMessage(Connection overConnection, Message msg) {
         currentConnection = overConnection;
-
-        Message msg;
-
-        try { msg = currentConnection.receiveMessage(); }
-        catch (EOFException e) {
-            System.err.println("Node "+node.getMyNodeID()+" received EOFException from "+overConnection.getReceiverID());
-            System.exit(Common.EXIT_FAILURE);
-            msg = null;
-        }
-
-        if (msg == null) {
-            return false;
-        }
-
         try { Thread.sleep(Common.MESSAGE_DELAY); }
         catch (InterruptedException ignored) {}
 
         synchronized (this) {
 
-            System.out.println("Participant "+node.getMyNodeID()+" received a "+msg.getCommand()+" from "+currentConnection.getReceiverID());
+            System.out.println("Participant "+ownerNode.getMyNodeID()+" received a "+msg.getCommand()+" from "+currentConnection.getReceiverID());
 
             /* if it's from the Coordinator, reset their timeout timer */
             switch (msg.getCommand()) {
@@ -84,11 +65,11 @@ public class ParticipantStateMachine extends StateMachine {
                 case UPDATE:
                 case DELETE:
                 case PRE_COMMIT:
-                    node.resetTimersFor(currentConnection.getReceiverID());
+                    ownerNode.resetTimersFor(currentConnection.getReceiverID());
                     break;
                 case ABORT:
                 case COMMIT:
-                    node.cancelTimersFor(currentConnection.getReceiverID());
+                    ownerNode.cancelTimersFor(currentConnection.getReceiverID());
                     break;
             }
 
@@ -99,7 +80,7 @@ public class ParticipantStateMachine extends StateMachine {
                 case UPDATE:
                 case DELETE:
                     VoteRequest vote = (VoteRequest)msg;
-                     receiveVoteRequest(vote, node.getVoteValue(vote));
+                     receiveVoteRequest(vote, ownerNode.getVoteValue(vote));
                      break;
 
                 /* PROTOCOL STAGES */
@@ -142,13 +123,13 @@ public class ParticipantStateMachine extends StateMachine {
                 		m = precommitted ? new PrecommitRequest(ongoingTransactionID) : new UncertainResponse(action.getTransactionID());
                 	}
                 	overConnection.sendMessage(m);
-                	node.resetTimersFor(overConnection.getReceiverID());
+                	ownerNode.resetTimersFor(overConnection.getReceiverID());
                 	break;
 
                 /* SET FAIL-CASE OR DELAY */
                 case PARTIAL_BROADCAST:
                 case DEATH_AFTER:
-                    node.addFailure(msg);
+                    ownerNode.addFailure(msg);
                     break;
 
                 /* SET INTERACTIVE DELAY */
@@ -165,32 +146,32 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     Message lastLoggedMessage() {
-    	List<Message> loggedMessages = node.getDtLog().getLoggedMessages().stream().collect(Collectors.toList());
+    	List<Message> loggedMessages = ownerNode.getDtLog().getLoggedMessages().stream().collect(Collectors.toList());
 		int s = loggedMessages.size();
 		return s > 0 ? loggedMessages.get(s - 1) : null;
 	}
 
     private void receiveUR_ELECTED(Message message) {
-        for (int i = 1; i < node.getMyNodeID(); i++) {
+        for (int i = 1; i < ownerNode.getMyNodeID(); i++) {
             removeFromUpset(i);
         }
-        node.becomeCoordinatorInRecovery(action, precommitted);
+        ownerNode.becomeCoordinatorInRecovery(action, precommitted);
     }
 
     private void receiveAbort(Message message) {
-        node.logMessage(message);
+        ownerNode.logMessage(message);
         action = null;
         setPeerSet(null);
-        node.setUpSet(null);
+        ownerNode.setUpSet(null);
     }
 
     private void receiveDubCoordinator(Message message) {
-        node.becomeCoordinator();
+        ownerNode.becomeCoordinator();
     }
 
     private void receiveVoteRequest(VoteRequest voteRequest, boolean voteValue) {
     	setCoordinatorID(currentConnection.getReceiverID());
-    	node.logMessage(voteRequest);
+    	ownerNode.logMessage(voteRequest);
         if (voteValue) {
             respondYESToVoteRequest(voteRequest);
         }
@@ -200,15 +181,15 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     private void receiveAddRequest(AddRequest addRequest) {
-        receiveVoteRequest(addRequest, !node.hasSongTupleWithName(addRequest.getSongTuple()));
+        receiveVoteRequest(addRequest, !ownerNode.hasSongTupleWithName(addRequest.getSongTuple()));
     }
 
     private void receiveUpdateRequest(UpdateRequest updateRequest) {
-        receiveVoteRequest(updateRequest, node.hasSong(updateRequest.getSongName()));
+        receiveVoteRequest(updateRequest, ownerNode.hasSong(updateRequest.getSongName()));
     }
 
     private void receiveDeleteRequest(DeleteRequest deleteRequest) {
-        receiveVoteRequest(deleteRequest, node.hasSong(deleteRequest.getSongName()));
+        receiveVoteRequest(deleteRequest, ownerNode.hasSong(deleteRequest.getSongName()));
     }
 
     /**
@@ -216,33 +197,33 @@ public class ParticipantStateMachine extends StateMachine {
      */
     private void receivePrecommit(PrecommitRequest precommitRequest) {
         setPrecommitted(true);
-        node.send(currentConnection, new AckRequest(getOngoingTransactionID()));
+        ownerNode.send(currentConnection, new AckRequest(getOngoingTransactionID()));
     }
 
     private void receiveCommit(CommitRequest commitRequest) {
-        node.logMessage(commitRequest);
-        node.applyActionToVolatileStorage(action);
+        ownerNode.logMessage(commitRequest);
+        ownerNode.applyActionToVolatileStorage(action);
         setOngoingTransactionID(NO_ONGOING_TRANSACTION);
     }
 
     public void respondNOToVoteRequest(Message message) {
         setOngoingTransactionID(NO_ONGOING_TRANSACTION);
-        node.logMessage(new AbortRequest(message.getTransactionID()));
-        node.send(currentConnection, new NoResponse(message));
+        ownerNode.logMessage(new AbortRequest(message.getTransactionID()));
+        ownerNode.send(currentConnection, new NoResponse(message));
     }
 
     private void respondYESToVoteRequest(VoteRequest voteRequest) {
         action = voteRequest;
         setOngoingTransactionID(voteRequest.getTransactionID());
         setPeerSet(voteRequest.getCloneOfPeerSet());
-        node.setUpSet(voteRequest.getCloneOfPeerSet());
-        node.resetTimersFor(currentConnection.getReceiverID());
+        ownerNode.setUpSet(voteRequest.getCloneOfPeerSet());
+        ownerNode.resetTimersFor(currentConnection.getReceiverID());
         logAndSendMessage(new YesResponse(voteRequest));
     }
 
     public void logAndSendMessage(Message message) {
-        node.logMessage(message);
-        node.send(currentConnection, message);
+        ownerNode.logMessage(message);
+        ownerNode.send(currentConnection, message);
     }
 
     /* Getters and Setters */
@@ -277,23 +258,27 @@ public class ParticipantStateMachine extends StateMachine {
 
     private void onTimeout(PeerTimeout timeout) {
     	if (timeout.getPeerId() == coordinatorId) {
-	    	node.logMessage(timeout);
+	    	ownerNode.logMessage(timeout);
 	        removeFromUpset(timeout.getPeerId());
-            node.electNewLeader(action, precommitted);
+            ownerNode.electNewLeader(action, precommitted);
+            ownerNode.sendTxnMgrMsg(timeout);
     	}
         else {
-            throw new RuntimeException("timeout on node ["+timeout.getPeerId()+"] "+
+            throw new RuntimeException("timeout on ownerNode ["+timeout.getPeerId()+"] "+
                                        "not known to be coordinator");
         }
     }
 
     private PeerReference getNodeWithLowestIDInUpset() {
-        if (node.getUpSet().isEmpty()) return null;
-        PriorityQueue<PeerReference> peerReferences = new PriorityQueue<>(node.getUpSet());
+        if (ownerNode.getUpSet().isEmpty()) return null;
+        PriorityQueue<PeerReference> peerReferences = new PriorityQueue<>(ownerNode.getUpSet());
         return peerReferences.poll();
     }
 
     private void removeFromUpset(int id) {
-        node.setUpSet(node.getUpSet().stream().filter(c -> c.getNodeID() != id).collect(Collectors.toList()));
+        ownerNode.setUpSet(ownerNode.getUpSet()
+                          .stream()
+                          .filter(c -> c.getNodeID() != id)
+                          .collect(Collectors.toList()));
     }
 }

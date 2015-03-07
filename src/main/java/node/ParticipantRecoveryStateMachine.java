@@ -12,7 +12,6 @@ import node.base.StateMachine;
 import system.network.Connection;
 import util.Common;
 
-import java.io.EOFException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -26,7 +25,6 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 		SomeProcessesInRecovery
 	};
 
-	private Node ownerNode;
 	VoteRequest uncommitted;
 	List<PeerReference> sortedPeers;
 	int currentPeerIndex;
@@ -45,8 +43,7 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 	}
 
 	public ParticipantRecoveryStateMachine(Node ownerNode, VoteRequest uncommitted, Collection<PeerReference> lastUpSet) {
-		super();
-		this.ownerNode = ownerNode;
+		super(ownerNode);
 		this.uncommitted = uncommitted;
 
 		Collection<PeerReference> peerRefsInRequest = uncommitted.getPeerSet();
@@ -64,23 +61,7 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 	}
 
 	@Override
-	public boolean receiveMessage(Connection overConnection) {
-        Message message = null;
-        try {
-            message = overConnection.receiveMessage();
-        }
-
-        catch (EOFException e) {
-            System.err.println("Node "+ownerNode.getMyNodeID()+" received EOFException from "+overConnection.getReceiverID());
-            System.exit(Common.EXIT_FAILURE);
-            message = null;
-        }
-
-        if (message == null)
-		{
-			return false;
-		}
-
+	public boolean receiveMessage(Connection overConnection, Message message) {
         synchronized (this) {
             int receiverID = overConnection.getReceiverID();
             if (!message.getCommand().equals(Command.TIMEOUT)) {

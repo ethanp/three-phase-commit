@@ -8,6 +8,7 @@ import messages.PeerTimeout;
 import messages.PrecommitRequest;
 import messages.StateRequest;
 import messages.UncertainResponse;
+import messages.YesResponse;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
@@ -15,7 +16,6 @@ import system.failures.PartialBroadcast;
 import system.network.Connection;
 import util.Common;
 
-import java.io.EOFException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.stream.Collectors;
@@ -35,7 +35,6 @@ public class CoordinatorStateMachine extends StateMachine {
 
 	private CoordinatorState state;
 	private Collection<Connection> txnConnections;
-	private Node ownerNode;
 	private VoteRequest action;
 	private int yesVotes;
 	private int ongoingTransactionID;
@@ -68,7 +67,7 @@ public class CoordinatorStateMachine extends StateMachine {
 	}
 
 	private CoordinatorStateMachine(Node ownerNode) {
-		this.ownerNode = ownerNode;
+        super(ownerNode);
 		resetToWaiting();
 	}
 
@@ -84,17 +83,7 @@ public class CoordinatorStateMachine extends StateMachine {
 		return action;
 	}
 
-    @Override public boolean receiveMessage(Connection overConnection) {
-
-        Message message;
-
-        try { message = overConnection.receiveMessage(); }
-        catch (EOFException e) { message = null; }
-
-        if (message == null) {
-    		return false;
-    	}
-
+    @Override public boolean receiveMessage(Connection overConnection, Message message) {
         try { Thread.sleep(Common.MESSAGE_DELAY); }
         catch (InterruptedException ignored) {}
 
@@ -209,6 +198,9 @@ public class CoordinatorStateMachine extends StateMachine {
                     Common.MESSAGE_DELAY = ((DelayMessage) message).getDelaySec()*1000;
                     break;
 
+                case UR_ELECTED:
+                    break;
+
                 default:
                     throw new RuntimeException("invalid message for coordinator");
             }
@@ -257,6 +249,7 @@ public class CoordinatorStateMachine extends StateMachine {
 	                       .collect(Collectors.toList());
 
 	    	ownerNode.logMessage(message);
+            ownerNode.logMessage(new YesResponse(message));
 	        setupTransactionConnectionsAndSendMessage(message, peerSet);
 	        setPeerSet(peerSet);
 	        ownerNode.getPeerConns().addAll(txnConnections);

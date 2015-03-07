@@ -21,6 +21,7 @@ import system.network.QueueConnection;
 import util.Common;
 import util.SongTuple;
 
+import java.io.EOFException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -182,7 +183,20 @@ public abstract class Node implements MessageReceiver {
             System.out.println(getMyNodeID()+" received too many messages from "+otherEnd);
             selfDestruct();
         }
-        return stateMachine.receiveMessage(connection);
+
+        Message message = null;
+        try {
+            message = connection.receiveMessage();
+        }
+        catch (EOFException e) {
+            System.err.println("Ignored EOFE");
+        }
+        if (message != null) {
+            synchronized (this) {
+                return stateMachine.receiveMessage(connection, message);
+            }
+        }
+        return false;
     }
 
     public void becomeCoordinator() {

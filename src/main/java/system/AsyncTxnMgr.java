@@ -184,8 +184,7 @@ public class AsyncTxnMgr extends TransactionManager {
         new Thread(mgrServer).start();
     }
 
-    public void receiveResponse(Message response) {
-
+    public synchronized void receiveResponse(Message response) {
         switch (response.getCommand()) {
             case COMMIT:
             case ABORT:
@@ -193,14 +192,16 @@ public class AsyncTxnMgr extends TransactionManager {
                 break;
 
             case TIMEOUT:
-                reviveNode((PeerTimeout)response);
+                reviveNode((PeerTimeout) response);
                 break;
-
         }
     }
 
     private void reviveNode(PeerTimeout response) {
         int deadID = response.getPeerId();
+        if (((AsyncManagerNodeRef)getNodeByID(deadID)).isAlive()) {
+            return;
+        }
         nodes = getNodes().stream()
                           .filter(r -> r.getNodeID() != deadID)
                           .collect(Collectors.toList());

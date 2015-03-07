@@ -142,7 +142,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		voteReq = getLastMessageToPeer(1);
 		assertEquals(request, voteReq);
 		Message logged = getLastMessageLogged();
-		assertTrue(logged instanceof AddRequest);
+		assertTrue(logged instanceof YesResponse);
 	}
 
 	@Test
