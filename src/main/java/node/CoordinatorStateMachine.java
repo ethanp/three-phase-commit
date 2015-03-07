@@ -37,9 +37,12 @@ public class CoordinatorStateMachine extends StateMachine {
 	private Node ownerNode;
 	private VoteRequest action;
 	private int yesVotes;
-	private int uncertainStates;
 	private int ongoingTransactionID;
 	private int acks;
+
+	// for termination protocol
+	private int uncertainStates;
+	private int precommits;
 
 	public static CoordinatorStateMachine startInTerminationProtocol(Node ownerNode, VoteRequest action) {
 		CoordinatorStateMachine machine = new CoordinatorStateMachine(ownerNode);
@@ -140,6 +143,36 @@ public class CoordinatorStateMachine extends StateMachine {
                     onTimeout(ref);
                     break;
 
+                case COMMIT:
+                	if (state == CoordinatorState.WaitingForStates) {
+                		// remove the connection that sent us COMMIT from txnConnections so that we don't send it a commit.
+                		txnConnections.removeIf(conn -> conn.getReceiverID() == overConnection.getReceiverID());
+                		commitCurrentAction();
+                	}
+                	else if (state != CoordinatorState.WaitingForCommand) {
+                		throw new RuntimeException("Received COMMIT when not expecting one");
+                	}
+                	break;
+                case ABORT:
+                	if (state == CoordinatorState.WaitingForStates) {
+                		// remove the connection that sent us ABORT from txnConnections so that we don't send it an abort.
+                		txnConnections.removeIf(conn -> conn.getReceiverID() == overConnection.getReceiverID());
+                		abortCurrentTransaction();
+                	}
+                	else if (state != CoordinatorState.WaitingForCommand) {
+                		throw new RuntimeException("Received COMMIT when not expecting one");
+                	}
+                	break;
+                case PRE_COMMIT:
+                	if (state == CoordinatorState.WaitingForStates) {
+                		++precommits;
+                		checkForEnoughUncertainStates();
+                	}
+                	else if (state != CoordinatorState.WaitingForCommand) {
+                		throw new RuntimeException("Received PRE_COMMIT when not expecting one");
+                	}
+                	break;
+                // TODO decision request
                 case DECISION_REQUEST:
                     /* reply with most-recent decision */
                     if (state == CoordinatorState.WaitingForCommand) {
@@ -267,34 +300,47 @@ public class CoordinatorStateMachine extends StateMachine {
 
     private void checkForEnoughUncertainStates() {
     	final Collection<PeerReference> upSet = ownerNode.getUpSet();
-    	if (uncertainStates >= upSet.size()) {
-    		abortCurrentTransaction();
+    	if ((uncertainStates + precommits) >= upSet.size()) {
+    		if (precommits == 0) {
+        		abortCurrentTransaction();
+    		}
+    		else {
+    			precommitCurrentAction();
+    		}
     	}
     }
 
     private void checkForEnoughYesVotes() {
     	final Collection<PeerReference> peerSet = getPeerSet();
     	if (yesVotes >= peerSet.size()) {
-    		PrecommitRequest precommit = new PrecommitRequest(ongoingTransactionID);
-    		for (Connection connection : txnConnections) {
-                ownerNode.resetTimersFor(connection.getReceiverID());
-                ownerNode.send(connection, precommit);
-    		}
-    		state = CoordinatorState.WaitingForAcks;
+    		precommitCurrentAction();
     	}
     }
 
     private void checkForEnoughAcks() {
     	final Collection<PeerReference> peerSet = getPeerSet();
 		if (acks >= peerSet.size()) {
-			CommitRequest commit = new CommitRequest(ongoingTransactionID);
-			ownerNode.logMessage(commit);
-            for (Connection connection : txnConnections) {
-                ownerNode.send(connection, commit);
-			}
-            ownerNode.sendTxnMgrMsg(commit);
-            ownerNode.applyActionToVolatileStorage(action);
-            resetToWaiting();
+			commitCurrentAction();
 		}
+    }
+
+    private void precommitCurrentAction() {
+		PrecommitRequest precommit = new PrecommitRequest(ongoingTransactionID);
+		for (Connection connection : txnConnections) {
+            ownerNode.resetTimersFor(connection.getReceiverID());
+            ownerNode.send(connection, precommit);
+		}
+		state = CoordinatorState.WaitingForAcks;
+    }
+
+    private void commitCurrentAction() {
+		CommitRequest commit = new CommitRequest(ongoingTransactionID);
+		ownerNode.logMessage(commit);
+        for (Connection connection : txnConnections) {
+            ownerNode.send(connection, commit);
+		}
+        ownerNode.sendTxnMgrMsg(commit);
+        ownerNode.commitAction(action);
+        resetToWaiting();
     }
 }

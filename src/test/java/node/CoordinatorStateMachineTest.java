@@ -8,10 +8,12 @@ import messages.Message;
 import messages.NoResponse;
 import messages.PeerTimeout;
 import messages.YesResponse;
+import messages.Message.Command;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
+import node.CoordinatorStateMachine.CoordinatorState;
 import node.system.SyncNode;
 
 import org.junit.Before;
@@ -59,6 +61,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 
         peerQueueSockets = new QueueSocket[2];
         coordinatorPeerReferences = new ArrayList<PeerReference>();
+        coordinatorPeerReferences.add(new PeerReference(TEST_COORD_ID, 0));
         for (int i = 0; i < 2; ++i) {
         	final int peerId = i + 2;
         	peerQueueSockets[i] = new QueueSocket(peerId, TEST_COORD_ID);
@@ -66,6 +69,8 @@ public class CoordinatorStateMachineTest extends TestCommon {
             syncNode.addConnection(coordinatorToPeer);
             coordinatorPeerReferences.add(new PeerReference(peerId, 0));
         }
+        syncNode.setUpSet(coordinatorPeerReferences);
+
 
 		song = new SongTuple("song", "url");
 		updatedSong = new SongTuple("song", "updated");
@@ -88,14 +93,17 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForCommand, csm.getState());
     }
 
-    private void peerRespondsWithYes(int peerIndex) {
-		peerQueueSockets[peerIndex].getConnectionToBID().sendMessage(new YesResponse(request));
+    private void peerRespondsWith(int peerIndex, Message response) {
+		peerQueueSockets[peerIndex].getConnectionToBID().sendMessage(response);
 		assertTrue(csm.receiveMessage(peerQueueSockets[peerIndex].getConnectionToAID()));
     }
 
+    private void peerRespondsWithYes(int peerIndex) {
+		peerRespondsWith(peerIndex, new YesResponse(request));
+    }
+
     private void peerRespondsWithNo(int peerIndex) {
-		peerQueueSockets[peerIndex].getConnectionToBID().sendMessage(new NoResponse(request));
-		assertTrue(csm.receiveMessage(peerQueueSockets[peerIndex].getConnectionToAID()));
+		peerRespondsWith(peerIndex, new NoResponse(request));
     }
 
     private void peerAcknowledgesPrecommit(int peerIndex) {
@@ -119,6 +127,11 @@ public class CoordinatorStateMachineTest extends TestCommon {
     private Message getLastMessageLogged() {
         Object[] messages = syncNode.getDtLog().getLoggedMessages().toArray();
         return (Message)messages[messages.length - 1];
+    }
+
+    private void startInTerminationProtocol(VoteRequest action) {
+    	syncNode.becomeCoordinatorInRecovery(action);
+    	csm = (CoordinatorStateMachine)syncNode.getStateMachine();
     }
 
 	@Test
