@@ -125,9 +125,19 @@ public class ParticipantStateMachine extends StateMachine {
                     onTimeout((PeerTimeout) msg);
                     break;
 
-                // TODO Decision-Request
                 case DECISION_REQUEST:
-                    throw new NotImplementedException();
+                	Message decision = node.getDecisionFor(msg.getTransactionID());
+                	if (decision != null) {
+                		overConnection.sendMessage(decision);
+                	}
+                	else if (msg.getTransactionID() == ongoingTransactionID && precommitted) {
+                		overConnection.sendMessage(new PrecommitRequest(ongoingTransactionID));
+                	}
+                	else {
+                		overConnection.sendMessage(new UncertainResponse(msg.getTransactionID()));
+                	}
+                	break;
+                	
                 case STATE_REQUEST:
                 	Message m, lastLogged = lastLoggedMessage();
                 	if (lastLogged == null) {

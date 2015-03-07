@@ -2,9 +2,11 @@ package node;
 
 import messages.AbortRequest;
 import messages.CommitRequest;
+import messages.DecisionRequest;
 import messages.DubCoordinatorMessage;
 import messages.ElectedMessage;
 import messages.Message;
+import messages.Message.Command;
 import messages.PrecommitRequest;
 import messages.YesResponse;
 import messages.vote_req.AddRequest;
@@ -12,8 +14,10 @@ import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.system.SyncNode;
+
 import org.junit.Before;
 import org.junit.Test;
+
 import system.network.QueueConnection;
 import system.network.QueueSocket;
 import util.Common;
@@ -392,5 +396,43 @@ public class ParticipantStateMachineTest extends TestCommon {
     public void testReceiveDUB_COORDINATOR() throws Exception {
         testReceiveFromCoordinator(new DubCoordinatorMessage());
         assertTrue(participantUnderTest.getStateMachine() instanceof CoordinatorStateMachine);
+    }
+    
+    @Test
+    public void testReceiveDecisionRequest_decisionAlreadyLogged_repliesWithDecision() {
+        final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
+        participantUnderTest.logMessage(action);
+        participantUnderTest.logMessage(new YesResponse(action));
+        participantUnderTest.logMessage(new CommitRequest(TXID));
+        
+        testReceiveFromCoordinator(new DecisionRequest(TXID));
+        Message last = getLastMessageInQueue(peerToCoordinator.getOutQueue());
+        assertEquals(Command.COMMIT, last.getCommand());
+    }
+
+    @Test
+    public void testReceiveDecisionRequest_precommitted_repliesWithPrecommit() {
+        final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
+        participantUnderTest.logMessage(action);
+        participantUnderTest.logMessage(new YesResponse(action));
+        participantSM.setOngoingTransactionID(TXID);
+        participantSM.setPrecommitted(true);
+        
+        testReceiveFromCoordinator(new DecisionRequest(TXID));
+        Message last = getLastMessageInQueue(peerToCoordinator.getOutQueue());
+        assertEquals(Command.PRE_COMMIT, last.getCommand());
+    }
+    
+    @Test
+    public void testReceiveDecisionRequest_uncertain_repliesWithUncertain() {
+        final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
+        participantUnderTest.logMessage(action);
+        participantUnderTest.logMessage(new YesResponse(action));
+        participantSM.setOngoingTransactionID(TXID);
+        participantSM.setPrecommitted(false);
+        
+        testReceiveFromCoordinator(new DecisionRequest(TXID));
+        Message last = getLastMessageInQueue(peerToCoordinator.getOutQueue());
+        assertEquals(Command.UNCERTAIN, last.getCommand());
     }
 }
