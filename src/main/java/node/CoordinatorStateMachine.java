@@ -340,7 +340,7 @@ public class CoordinatorStateMachine extends StateMachine {
             ownerNode.send(connection, commit);
 		}
         ownerNode.sendTxnMgrMsg(commit);
-        ownerNode.commitAction(action);
+        ownerNode.applyActionToVolatileStorage(action);
         resetToWaiting();
     }
 }

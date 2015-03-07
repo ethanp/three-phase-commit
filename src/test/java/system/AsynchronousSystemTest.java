@@ -220,9 +220,9 @@ public class AsynchronousSystemTest extends TestCommon {
         system.killAllNodes();
     }
 
-    @Test
+    @Ignore
     public void testCoordinatorFailsAfterSendingPrecommitToAll() throws Exception {
-        String cmdStr = "add a_song a_url -partialPrecommit "
+        String cmdStr = "add a_song a_url -partialPrecommit ";
 
     }
 
