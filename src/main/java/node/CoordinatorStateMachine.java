@@ -65,6 +65,14 @@ public class CoordinatorStateMachine extends StateMachine {
 		return state;
 	}
 
+	public int getOngoingTransactionId() {
+		return ongoingTransactionID;
+	}
+	
+	public VoteRequest getAction() {
+		return action;
+	}
+	
     @Override public boolean receiveMessage(Connection overConnection) {
 
         Message message;
@@ -224,11 +232,13 @@ public class CoordinatorStateMachine extends StateMachine {
 		                      ? ownerNode.getPeerConnForId(reference.nodeID)
 		                      : ownerNode.connectTo(reference);
 
-		    conns.add(conn);
-		    ownerNode.send(conn, message);
-
-		    /* start timers on everyone */
-		    ownerNode.resetTimersFor(reference.getNodeID());
+		    if (conn != null) {
+			    conns.add(conn);
+			    ownerNode.send(conn, message);
+	
+			    /* start timers on everyone */
+			    ownerNode.resetTimersFor(reference.getNodeID());
+		    }
 		}
 		txnConnections = conns;
 	}

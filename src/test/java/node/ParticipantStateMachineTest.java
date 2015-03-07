@@ -332,7 +332,7 @@ public class ParticipantStateMachineTest extends TestCommon {
         testReceiveFromCoordinator(msg);
 
         /* assert correct resulting state */
-        assertEquals(NO_ONGOING_TRANSACTION, participantSM.getOngoingTransactionID());
+        assertEquals(TXID, participantSM.getOngoingTransactionID());
         assertNull(participantSM.getAction());
         assertNull(participantSM.getPeerSet());
         assertNull(participantUnderTest.getUpSet());
@@ -365,18 +365,27 @@ public class ParticipantStateMachineTest extends TestCommon {
         final String logAsString = participantUnderTest.getDtLog().getLogAsString();
         assertThat(logAsString, containsString("TIMEOUT"));
         assertThat(logAsString, containsString(String.valueOf(coordID)));
+        // normally the participant, having become the coordinator, would broadcast a state_req to the other peers,
+        // but we haven't given it any other connections to those peers.
         assertTrue(participantUnderTest.getStateMachine() instanceof CoordinatorStateMachine);
     }
 
     @Test
     public void testReceiveUR_ELECTED() throws Exception {
-
+        final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
+        participantSM.setAction(action);
+        participantSM.setPeerSet(A_PEER_REFS);
+        participantUnderTest.setUpSet(participantSM.getPeerSet()
+                .stream()
+                .map(PeerReference::clone)
+                .collect(Collectors.toList()));
+  	
         testReceiveFromCoordinator(new ElectedMessage(TXID));
 
-        assertTrue(participantUnderTest.getStateMachine() instanceof CoordinatorStateMachine);
-
-        /* TODO after the CoordinatorStateMachine has been fleshed-we'll need to verify
-         *      that the transaction ID and command-action etc. have remained the same */
+        CoordinatorStateMachine coordinator = (CoordinatorStateMachine)participantUnderTest.getStateMachine();
+        assertTrue(coordinator != null);
+        assertEquals(action, coordinator.getAction());
+        assertEquals(TXID, coordinator.getOngoingTransactionId());
     }
 
     @Test
