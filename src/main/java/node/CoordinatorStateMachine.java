@@ -139,6 +139,10 @@ public class CoordinatorStateMachine extends StateMachine {
     		abortCurrentTransaction();
     	}
     	else if (state == CoordinatorState.WaitingForAcks) {
+            // TODO I think this is a BUG
+            /* the peer should be removed from the UpSet and this should be Logged.
+             * the peer should NOT be removed from the peer set
+             */
     		getPeerSet().remove(peerReference);
     		txnConnections.remove(ownerNode.getPeerConnForId(peerReference.nodeID));
     		checkForEnoughAcks();

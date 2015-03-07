@@ -29,19 +29,17 @@ public class AsyncProcessNode extends Node {
     AsyncProcessNode(int systemListenPort, int myNodeID) {
         super(myNodeID);
         dtLog = new FileDTLog(new File(Common.LOG_DIR, String.valueOf(myNodeID)), this);
+        System.out.println(getMyNodeID()+": log on startup: "+dtLog.getLogAsString());
         recoverFromDtLog();
 
         /* start local server */
         nodeServer = new NodeServer();
         L = new AsyncLogger(getMyNodeID(), getListenPort());
-        L.OG("Server starting");
         new Thread(nodeServer).start();
 
         /* connect to System */
         try {
-            L.OG("establishing socket connection to system at port "+systemListenPort);
             final Socket socket = new Socket(Common.LOCALHOST, systemListenPort);
-            L.OG("establishing object connection to system at port "+systemListenPort);
             txnMgrConn = new ObjectConnection(socket, TXN_MGR_ID);
             L.OG("connected to System");
 

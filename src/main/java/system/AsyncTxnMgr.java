@@ -126,6 +126,11 @@ public class AsyncTxnMgr extends TransactionManager {
         createNode(nodeToKill.getNodeID());
     }
 
+    public void restartNodeWithID(int nodeID) {
+        System.out.println("Mgr restarting node "+nodeID);
+        restartNode(getNodeByID(nodeID));
+    }
+
     public ManagerNodeRef createNode(int nodeID) {
 
         final List<String> commandLine = Arrays.asList(
@@ -175,7 +180,6 @@ public class AsyncTxnMgr extends TransactionManager {
     private void startServer() {
         mgrServer = new TxnMgrServer(this);
         L = new AsyncLogger(Common.TXN_MGR_ID, mgrServer.getListenPort());
-        L.OG("Server started");
         new Thread(mgrServer).start();
     }
 

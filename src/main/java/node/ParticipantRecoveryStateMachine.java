@@ -71,7 +71,8 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
         }
 
         catch (EOFException e) {
-            System.err.println("Node "+ownerNode.getMyNodeID()+" received EOFException");
+            System.err.println("Node "+ownerNode.getMyNodeID()+" received EOFException from "+overConnection.getReceiverID());
+            System.exit(Common.EXIT_FAILURE);
             message = null;
         }
 
