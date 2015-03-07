@@ -66,7 +66,7 @@ public class ParticipantStateMachineTest extends TestCommon {
         /* state should be reset to have no known ongoing transaction or working peer set */
         assertEquals(NO_ONGOING_TRANSACTION, participantSM.getOngoingTransactionID());
         assertNull(participantSM.getPeerSet());
-        assertNull(participantSM.getUpSet());
+        assertNull(participantUnderTest.getUpSet());
     }
 
     private void assertStateAfterYESSentToCoordinator() {
@@ -80,7 +80,7 @@ public class ParticipantStateMachineTest extends TestCommon {
         /* state should be reset to have no known ongoing transaction or working peer set */
         assertEquals(TXID, participantSM.getOngoingTransactionID());
         assertEquals(A_PEER_REFS, participantSM.getPeerSet());
-        assertEquals(A_PEER_REFS, participantSM.getUpSet());
+        assertEquals(A_PEER_REFS, participantUnderTest.getUpSet());
     }
 
     @Test
@@ -335,7 +335,7 @@ public class ParticipantStateMachineTest extends TestCommon {
         assertEquals(NO_ONGOING_TRANSACTION, participantSM.getOngoingTransactionID());
         assertNull(participantSM.getAction());
         assertNull(participantSM.getPeerSet());
-        assertNull(participantSM.getUpSet());
+        assertNull(participantUnderTest.getUpSet());
         assertThat(participantUnderTest.getDtLog().getLogAsString(), containsString("ABORT"));
     }
 
@@ -349,7 +349,7 @@ public class ParticipantStateMachineTest extends TestCommon {
         final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
         participantSM.setAction(action);
         participantSM.setPeerSet(A_PEER_REFS);
-        participantSM.setUpSet(participantSM.getPeerSet()
+        participantUnderTest.setUpSet(participantSM.getPeerSet()
                                             .stream()
                                             .map(PeerReference::clone)
                                             .collect(Collectors.toList()));
@@ -365,7 +365,7 @@ public class ParticipantStateMachineTest extends TestCommon {
         final String logAsString = participantUnderTest.getDtLog().getLogAsString();
         assertThat(logAsString, containsString("TIMEOUT"));
         assertThat(logAsString, containsString(String.valueOf(coordID)));
-        assertTrue(participantUnderTest.getStateMachine() instanceof ElectionStateMachine);
+        assertTrue(participantUnderTest.getStateMachine() instanceof CoordinatorStateMachine);
     }
 
     @Test

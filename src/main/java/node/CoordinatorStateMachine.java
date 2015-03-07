@@ -6,6 +6,7 @@ import messages.DelayMessage;
 import messages.Message;
 import messages.PeerTimeout;
 import messages.PrecommitRequest;
+import messages.StateRequest;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
@@ -13,6 +14,7 @@ import system.network.Connection;
 import util.Common;
 
 import java.io.EOFException;
+import java.io.ObjectInputStream.GetField;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.stream.Collectors;
@@ -27,6 +29,7 @@ public class CoordinatorStateMachine extends StateMachine {
 		WaitingForCommand,
 		WaitingForVotes,
 		WaitingForAcks,
+		WaitingForStates
 	}
 
 	private CoordinatorState state;
@@ -34,10 +37,26 @@ public class CoordinatorStateMachine extends StateMachine {
 	private Node ownerNode;
 	private VoteRequest action;
 	private int yesVotes;
+	private int uncertainStates;
 	private int ongoingTransactionID;
 	private int acks;
 
-	public CoordinatorStateMachine(Node ownerNode) {
+	public static CoordinatorStateMachine startInTerminationProtocol(Node ownerNode, VoteRequest action) {
+		CoordinatorStateMachine machine = new CoordinatorStateMachine(ownerNode);
+		machine.action = action;
+		machine.ongoingTransactionID = action.getTransactionID();
+		machine.state = CoordinatorState.WaitingForStates;
+		machine.uncertainStates = 1;
+		Collection<PeerReference> notMe = ownerNode.getUpSet().stream().filter(pr -> pr.getNodeID() != ownerNode.getMyNodeID()).collect(Collectors.toList());
+		machine.setupTransactionConnectionsAndSendMessage(new StateRequest(machine.ongoingTransactionID), notMe);
+		return machine;
+	}
+	
+	public static CoordinatorStateMachine startInNormalMode(Node ownerNode) {
+		return new CoordinatorStateMachine(ownerNode);
+	}
+	
+	private CoordinatorStateMachine(Node ownerNode) {
 		this.ownerNode = ownerNode;
 		resetToWaiting();
 	}
@@ -87,6 +106,12 @@ public class CoordinatorStateMachine extends StateMachine {
                         abortCurrentTransaction();
                     }
                     break;
+                case UNCERTAIN:
+                	if (state == CoordinatorState.WaitingForStates) {
+                		++uncertainStates;
+                		checkForEnoughUncertainStates();
+                	}
+                	break;
                 case ACK:
                     ownerNode.cancelTimersFor(overConnection.getReceiverID());
                     if (state == CoordinatorState.WaitingForAcks) {
@@ -103,6 +128,7 @@ public class CoordinatorStateMachine extends StateMachine {
                                                     .filter(pr -> pr.nodeID == peerID)
                                                     .findFirst()
                                                     .get();
+                    ownerNode.logMessage(message);
                     onTimeout(ref);
                     break;
 
@@ -154,6 +180,7 @@ public class CoordinatorStateMachine extends StateMachine {
 		setPeerSet(null);
 		txnConnections = null;
 		state = CoordinatorState.WaitingForCommand;
+		ownerNode.cancelAllTimers();
     }
 
     private void receivePlaylistCommand(VoteRequest message) {
@@ -166,23 +193,9 @@ public class CoordinatorStateMachine extends StateMachine {
 	                       .filter(ref -> ref.getNodeID() != ownerNode.getMyNodeID())
 	                       .collect(Collectors.toList());
 
-	        Collection<Connection> conns = new ArrayList<>();
 	    	ownerNode.logMessage(message);
-	        /* connect to every peer the ownerNode is not already connected to */
-	        for (PeerReference reference : peerSet) {
-
-	            Connection conn = ownerNode.isConnectedTo(reference)
-	                              ? ownerNode.getPeerConnForId(reference.nodeID)
-	                              : ownerNode.connectTo(reference);
-
-	            conns.add(conn);
-                ownerNode.send(conn, message);
-
-                /* start timers on everyone */
-                ownerNode.resetTimersFor(reference.getNodeID());
-	        }
+	        setupTransactionConnectionsAndSendMessage(message, peerSet);
 	        setPeerSet(peerSet);
-	        txnConnections = conns;
 	        ownerNode.getPeerConns().addAll(txnConnections);
 
 	        state = CoordinatorState.WaitingForVotes;
@@ -200,11 +213,38 @@ public class CoordinatorStateMachine extends StateMachine {
     	}
     }
 
+	private void setupTransactionConnectionsAndSendMessage(Message message,
+			final Collection<PeerReference> peerSet) {
+        Collection<Connection> conns = new ArrayList<>();
+		
+		/* connect to every peer the ownerNode is not already connected to */
+		for (PeerReference reference : peerSet) {
+
+		    Connection conn = ownerNode.isConnectedTo(reference)
+		                      ? ownerNode.getPeerConnForId(reference.nodeID)
+		                      : ownerNode.connectTo(reference);
+
+		    conns.add(conn);
+		    ownerNode.send(conn, message);
+
+		    /* start timers on everyone */
+		    ownerNode.resetTimersFor(reference.getNodeID());
+		}
+		txnConnections = conns;
+	}
+
     private void abortCurrentTransaction() {
 		AbortRequest abort = new AbortRequest(ongoingTransactionID);
 		ownerNode.logMessage(abort);
         ownerNode.broadcast(txnConnections, abort);
 		resetToWaiting();
+    }
+
+    private void checkForEnoughUncertainStates() {
+    	final Collection<PeerReference> upSet = ownerNode.getUpSet();
+    	if (uncertainStates >= upSet.size()) {
+    		abortCurrentTransaction();
+    	}
     }
 
     private void checkForEnoughYesVotes() {
@@ -218,7 +258,7 @@ public class CoordinatorStateMachine extends StateMachine {
     		state = CoordinatorState.WaitingForAcks;
     	}
     }
-
+    
     private void checkForEnoughAcks() {
     	final Collection<PeerReference> peerSet = getPeerSet();
 		if (acks >= peerSet.size()) {

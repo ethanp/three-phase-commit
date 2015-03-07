@@ -48,6 +48,7 @@ public abstract class Message implements Serializable {
         TIMEOUT,
         NODE,
         DECISION_REQUEST,
+        STATE_REQUEST,
         UNCERTAIN,
         KILL_SIG,
         IN_RECOVERY,

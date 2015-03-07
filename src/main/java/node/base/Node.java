@@ -1,5 +1,6 @@
 package node.base;
 
+import messages.ElectedMessage;
 import messages.Message;
 import messages.PeerTimeout;
 import messages.TokenWriter;
@@ -8,7 +9,6 @@ import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.CoordinatorStateMachine;
-import node.ElectionStateMachine;
 import node.LogRecoveryStateMachine;
 import node.ParticipantRecoveryStateMachine;
 import node.ParticipantStateMachine;
@@ -31,6 +31,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 
+import javax.jws.Oneway;
+
 import static util.Common.TIMEOUT_MONITOR_ID;
 
 /**
@@ -46,6 +48,7 @@ public abstract class Node implements MessageReceiver {
 
     protected Connection txnMgrConn;
     protected Collection<Connection> peerConns = new ArrayList<>();
+    private Collection<PeerReference> upSet = null;
 
     protected PartialBroadcast partialBroadcast = null;
     protected DeathAfter deathAfter = null;
@@ -183,11 +186,19 @@ public abstract class Node implements MessageReceiver {
     }
 
     public void becomeCoordinator() {
-        stateMachine = new CoordinatorStateMachine(this);
+        stateMachine = CoordinatorStateMachine.startInNormalMode(this);
+    }
+    
+    public void becomeCoordinatorInRecovery(VoteRequest ongoingAction) {
+    	stateMachine = CoordinatorStateMachine.startInTerminationProtocol(this, ongoingAction);
     }
 
     public void becomeParticipant() {
     	stateMachine = new ParticipantStateMachine(this);
+    }
+    
+    public void becomeParticipantInRecovery(VoteRequest ongoingAction, boolean precommit) {
+    	stateMachine = ParticipantStateMachine.startInTerminationProtocol(this, ongoingAction, precommit);
     }
 
     public StateMachine getStateMachine() {
@@ -232,6 +243,14 @@ public abstract class Node implements MessageReceiver {
         this.peerConns = peerConns;
     }
 
+    public Collection<PeerReference> getUpSet() {
+        return upSet;
+    }
+
+    public void setUpSet(Collection<PeerReference> upSet) {
+        this.upSet = upSet;
+    }
+    
     public void resetTimersFor(int peerID) {
         timeoutMonitor.resetTimersFor(peerID);
     }
@@ -239,10 +258,24 @@ public abstract class Node implements MessageReceiver {
     public void cancelTimersFor(int peerID) {
         timeoutMonitor.cancelTimersFor(peerID);
     }
-
-    // TODO make this actually do something
-    public void startElectionProtocol() {
-        stateMachine = new ElectionStateMachine();
+    
+    public void electNewLeader(VoteRequest ongoingAction, boolean precommitted) {
+    	PeerReference newCoordinator = upSet.stream().min((a, b) -> a.compareTo(b)).get();
+    	if (newCoordinator.getNodeID() == myNodeID) {    		
+    		becomeCoordinatorInRecovery(ongoingAction);    		
+    	}
+    	else {
+    		getOrConnectToPeer(newCoordinator).sendMessage(new ElectedMessage(ongoingAction.getTransactionID()));
+    		resetTimersFor(newCoordinator.getNodeID());
+    		stateMachine = ParticipantStateMachine.startInTerminationProtocol(this, ongoingAction, precommitted);
+    	}        
+    }
+    
+    public Connection getOrConnectToPeer(PeerReference peer) {
+        Connection connection = isConnectedTo(peer)
+                ? getPeerConnForId(peer.getNodeID())
+                : connectTo(peer);
+        return connection;
     }
 
     public void addFailure(Message msg) {
@@ -337,4 +370,11 @@ public abstract class Node implements MessageReceiver {
             }
         }
     }
+
+	public void cancelAllTimers() {
+		// TODO Auto-generated method stub
+		for (Connection conn : peerConns) {
+			cancelTimersFor(conn.getReceiverID());
+		}
+	}
 }

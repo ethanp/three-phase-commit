@@ -59,7 +59,7 @@ public class SyncNode extends Node {
      * <p>
      * In the asynchronous case, it means establishing a socket with the referenced peer's server
      */
-    @Override public Connection connectTo(PeerReference peerRef) {
+    @Override public Connection connectTo(PeerReference peerRef) {    	
         SyncManagerNodeRef n = (SyncManagerNodeRef)
                 syncTxnMgr.getNodes()
                           .stream()
