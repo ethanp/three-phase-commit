@@ -79,6 +79,11 @@ public class SyncNode extends Node {
         return connectionToPeer;
     }
 
+    @Override public void addTimerFor(int peerID) {
+        System.out.println("Sync nodes don't add timers");
+        /* nothing */
+    }
+
     @Override public void selfDestruct() {
         System.err.println("This is where I WOULD self-destruct.");
     }

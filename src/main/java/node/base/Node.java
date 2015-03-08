@@ -22,6 +22,7 @@ import util.Common;
 import util.SongTuple;
 
 import java.io.EOFException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -32,8 +33,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-
-import static util.Common.TIMEOUT_MONITOR_ID;
 
 /**
  * Ethan Petuchowski 2/27/15
@@ -245,7 +244,7 @@ public abstract class Node implements MessageReceiver {
      *
      * In the asynchronous case, it means establishing a socket with the referenced peer's server
      */
-    public abstract Connection connectTo(PeerReference peerReference);
+    public abstract Connection connectTo(PeerReference peerReference) throws IOException;
 
     public boolean isConnectedTo(PeerReference reference) {
         return peerConns.stream()
@@ -266,6 +265,7 @@ public abstract class Node implements MessageReceiver {
     }
 
     public void resetTimersFor(int peerID) {
+        System.out.println(getMyNodeID()+": resetting timer for "+peerID);
         timeoutMonitor.resetTimersFor(peerID);
     }
 
@@ -273,9 +273,7 @@ public abstract class Node implements MessageReceiver {
         timeoutMonitor.cancelTimersFor(peerID);
     }
 
-    public void addTimerFor(int peerID) {
-        timeoutMonitor.startTimer(peerID);
-    }
+    public abstract void addTimerFor(int peerID);
 
     public void electNewLeader(VoteRequest ongoingAction, boolean precommitted) {
     	PeerReference newCoordinator = upSet.stream().min((a, b) -> a.compareTo(b)).get();
@@ -283,17 +281,23 @@ public abstract class Node implements MessageReceiver {
     		becomeCoordinatorInRecovery(ongoingAction, precommitted);
     	}
     	else {
-    		getOrConnectToPeer(newCoordinator).sendMessage(new ElectedMessage(ongoingAction.getTransactionID()));
-    		resetTimersFor(newCoordinator.getNodeID());
-    		stateMachine = ParticipantStateMachine.startInTerminationProtocol(this, ongoingAction, precommitted);
-            final ParticipantStateMachine participantStateMachine = (ParticipantStateMachine) stateMachine;
-            participantStateMachine.setCoordinatorID(newCoordinator.getNodeID());
-            participantStateMachine.setCoordinatorConnection(getOrConnectToPeer(newCoordinator));
+            try {
+                final Connection newCoordConn = getOrConnectToPeer(newCoordinator);
+                newCoordConn.sendMessage(new ElectedMessage(ongoingAction.getTransactionID()));
+                resetTimersFor(newCoordinator.getNodeID());
+                stateMachine = ParticipantStateMachine.startInTerminationProtocol(this, ongoingAction, precommitted);
+                final ParticipantStateMachine participantStateMachine = (ParticipantStateMachine) stateMachine;
+                participantStateMachine.setCoordinatorID(newCoordinator.getNodeID());
+                participantStateMachine.setCoordinatorConnection(newCoordConn);
+            }
+            catch (IOException e) {
+                System.err.println("Couldn't elect "+newCoordinator.getNodeID()+" bc connection failed");
 
+            }
     	}
     }
 
-    public Connection getOrConnectToPeer(PeerReference peer) {
+    public Connection getOrConnectToPeer(PeerReference peer) throws IOException {
         Connection connection = isConnectedTo(peer)
                 ? getPeerConnForId(peer.getNodeID())
                 : connectTo(peer);
@@ -344,12 +348,12 @@ public abstract class Node implements MessageReceiver {
         return partialBroadcast;
     }
 
-    private class TimeoutMonitor {
+    protected class TimeoutMonitor {
 
         /* timers by peerID */
         Map<Integer, List<Thread>> ongoingTimers = new HashMap<>();
 
-        void startTimer(int peerID) {
+        public void startTimer(int peerID) {
             if (ongoingTimers.containsKey(peerID)) {
                 ongoingTimers.get(peerID).add(createTimer(peerID));
             }
@@ -358,14 +362,14 @@ public abstract class Node implements MessageReceiver {
             }
         }
 
-        void cancelTimersFor(int peerID) {
+        public void cancelTimersFor(int peerID) {
             if (ongoingTimers.containsKey(peerID)) {
                 ongoingTimers.get(peerID).stream().forEach(Thread::interrupt);
                 ongoingTimers.remove(peerID);
             }
         }
 
-        void resetTimersFor(int peerID) {
+        public void resetTimersFor(int peerID) {
             cancelTimersFor(peerID);
             startTimer(peerID);
         }
@@ -397,7 +401,7 @@ public abstract class Node implements MessageReceiver {
 
                     receiveMessageFrom(
                             new QueueConnection(
-                                    TIMEOUT_MONITOR_ID,
+                                    peerID,
                                     new LinkedList<>(Arrays.asList(new PeerTimeout(peerID))),
                                     new LinkedList<>()),
                             0);

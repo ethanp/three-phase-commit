@@ -36,7 +36,8 @@ public class ObjectConnection extends Connection {
                 return (Message) in.readObject();
             }
             catch (EOFException e) {
-                System.err.println("Node "+Common.ASYNC_NODE_ID+": EOF from "+getReceiverID());
+                System.err.println("Node "+Common.ASYNC_NODE_ID+": EOF from "+getReceiverID()+", "+
+                                   "closing socket");
                 try {
                     socket.close();
                 }

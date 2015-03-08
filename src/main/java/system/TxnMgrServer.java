@@ -88,7 +88,7 @@ public class TxnMgrServer implements Runnable, MessageReceiver {
             final int nodeID = connection.getReceiverID();
             if (message == null) {
                 System.err.println("TxnMgrServer received a null message from "+nodeID);
-                txnMgr.reviveNode(nodeID);
+//                txnMgr.reviveNode(nodeID);
 
                 /* if it was the coordinator who died, */
                 if (nodeID == txnMgr.getCoordinator().getNodeID() && txnMgr.getTransactionResult() == null) {

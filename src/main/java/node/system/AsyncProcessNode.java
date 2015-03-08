@@ -80,21 +80,17 @@ public class AsyncProcessNode extends Node {
      * In the asynchronous case, it means (SYNCHRONOUSLY) establishing a socket with the referenced
      * peer's server
      */
-    @Override public Connection connectTo(PeerReference peerReference) {
-        try {
-            final ObjectConnection connection = new ObjectConnection(
-                    new Socket(LOCALHOST, peerReference.getListeningPort()),
-                    peerReference.getNodeID());
-            addConnection(connection);
-            connection.sendMessage(new NodeMessage(getMyNodeID(), getListenPort()));
-            return connection;
-        }
-        catch (IOException e) {
-            System.err.println("Couldn't connect to peer "+peerReference.getNodeID()+" "+
-                               "on port "+peerReference.getListeningPort());
-            e.printStackTrace();
-            return null;
-        }
+    @Override public Connection connectTo(PeerReference peerReference) throws IOException {
+        final ObjectConnection connection = new ObjectConnection(
+                new Socket(LOCALHOST, peerReference.getListeningPort()),
+                peerReference.getNodeID());
+        addConnection(connection);
+        connection.sendMessage(new NodeMessage(getMyNodeID(), getListenPort()));
+        return connection;
+    }
+
+    @Override public void addTimerFor(int peerID) {
+        timeoutMonitor.startTimer(peerID);
     }
 
     @Override public void selfDestruct() {

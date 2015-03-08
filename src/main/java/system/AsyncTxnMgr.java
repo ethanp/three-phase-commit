@@ -2,7 +2,6 @@ package system;
 
 import console.CommandConsole;
 import console.ConsoleCommand;
-import messages.DecisionRequest;
 import messages.DelayMessage;
 import messages.KillSig;
 import messages.Message;
@@ -197,16 +196,16 @@ public class AsyncTxnMgr extends TransactionManager {
 
             case TIMEOUT:
                 final int peerId = ((PeerTimeout) response).getPeerId();
-                if (peerId > getCoordinator().getNodeID()) {
+//                if (peerId > getCoordinator().getNodeID()) {
                     reviveNode(peerId);
-                }
+//                }
                 break;
 
             default:
-                if (getTransactionResult() == null) {
-                    try { Thread.sleep(500); } catch (InterruptedException e) {}
-                    sendCoordinator(new DecisionRequest(getTransactionID()));
-                }
+//                if (getTransactionResult() == null) {
+//                    try { Thread.sleep(500); } catch (InterruptedException e) {}
+//                    sendCoordinator(new DecisionRequest(getTransactionID()));
+//                }
                 break;
         }
     }

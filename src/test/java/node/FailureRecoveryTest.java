@@ -1,5 +1,6 @@
 package node;
 
+import messages.DecisionRequest;
 import messages.ElectedMessage;
 import messages.Message;
 import messages.Message.Command;
@@ -54,16 +55,22 @@ public class FailureRecoveryTest extends TestCommon {
 
 	@Test
 	public void testTotalFailureRecovery_lastToRecoverBecomesCoordinator() {
-		AddRequest add = new AddRequest(songTuple, TXID, peerReferences);
-		YesResponse yes = new YesResponse(add);
-		PeerTimeout firstTimeout = new PeerTimeout(1);
-		PeerTimeout secondTimeout = new PeerTimeout(2);
-		SyncNode firstNode = nodesUnderTest[0];
-		SyncNode secondNode = nodesUnderTest[1];
-		SyncNode thirdNode = nodesUnderTest[2];
-        QueueSocket oneToTwo = new QueueSocket(1, 2);
-        QueueSocket oneToThree = new QueueSocket(1, 3);
-        QueueSocket twoToThree = new QueueSocket(2, 3);
+		final AddRequest add = new AddRequest(songTuple, TXID, peerReferences);
+		final YesResponse yes = new YesResponse(add);
+		final PeerTimeout firstTimeout = new PeerTimeout(1);
+		final PeerTimeout secondTimeout = new PeerTimeout(2);
+		final SyncNode firstNode = nodesUnderTest[0];
+		final SyncNode secondNode = nodesUnderTest[1];
+		final SyncNode thirdNode = nodesUnderTest[2];
+        final QueueSocket oneToTwoSocket = new QueueSocket(1, 2);
+        final QueueSocket oneToThreeSocket = new QueueSocket(1, 3);
+        final QueueSocket twoToThreeSocket = new QueueSocket(2, 3);
+        final QueueConnection oneToTwo = oneToTwoSocket.getConnectionToBID();
+        final QueueConnection twoToOne = oneToTwoSocket.getConnectionToAID();
+        final QueueConnection oneToThree = oneToThreeSocket.getConnectionToBID();
+        final QueueConnection threeToOne = oneToThreeSocket.getConnectionToAID();
+        final QueueConnection twoToThree = twoToThreeSocket.getConnectionToBID();
+        final QueueConnection threeToTwo = twoToThreeSocket.getConnectionToAID();
 
 		// set up first log
 		SyncNode stubNode = new SyncNode(-1, null);
@@ -71,28 +78,35 @@ public class FailureRecoveryTest extends TestCommon {
 		stubNode.logMessage(yes);
 
 		// first node "connects" to second and third, but they're not up yet
-		firstNode.addConnection(oneToTwo.getConnectionToBID());
-		firstNode.addConnection(oneToThree.getConnectionToBID());
+		firstNode.addConnection(oneToTwo);
+        firstNode.addConnection(oneToThree);
 
 		firstNode.setDtLog(stubNode.getDtLog());
 		firstNode.recoverFromDtLog();
 		ParticipantRecoveryStateMachine firstSM = (ParticipantRecoveryStateMachine)firstNode.getStateMachine();
+
 		// first node sends decision_req to second node, which times out
-		oneToTwo.getConnectionToBID().getOutQueue().clear();	// remove the message so it isn't received later
-		oneToTwo.getConnectionToAID().sendMessage(new PeerTimeout(2));
-		assertTrue(firstSM.receiveMessage(oneToTwo.getConnectionToBID()));
+		oneToTwo.getOutQueue().clear(); // remove the message so it isn't received later
+
+        twoToOne.sendMessage(new PeerTimeout(2));
+		assertTrue(firstSM.receiveMessage(oneToTwo));
+
 		// first node sends decision_req to third node, which times out
-		oneToThree.getConnectionToBID().getOutQueue().clear(); // remove the message so it isn't received later
-		oneToThree.getConnectionToAID().sendMessage(new PeerTimeout(3));
-		assertTrue(firstSM.receiveMessage(oneToThree.getConnectionToBID()));
+		oneToThree.getOutQueue().clear(); // remove the message so it isn't received later
+
+        threeToOne.sendMessage(new PeerTimeout(3));
+		assertTrue(firstSM.receiveMessage(oneToThree));
+
 		// first node is now waiting again and has sent another decision_req to second node, which times outs
-		oneToTwo.getConnectionToBID().getOutQueue().clear();	// remove the message so it isn't received later
+		oneToTwo.getOutQueue().clear();	// remove the message so it isn't received later
+
 		// assert its up set
 		Collection<Integer> firstUpSetIntersection = firstSM.getUpSetIntersection();
 		assertEquals(3, firstUpSetIntersection.size());
 		assertTrue(firstUpSetIntersection.contains(1));
 		assertTrue(firstUpSetIntersection.contains(2));
 		assertTrue(firstUpSetIntersection.contains(3));
+
         // verify first node's recovery set
 		Collection<Integer> firstRecoveredSet = firstSM.getRecoveredProcesses();
 		assertEquals(1, firstRecoveredSet.size());
@@ -104,27 +118,34 @@ public class FailureRecoveryTest extends TestCommon {
 		stubNode.logMessage(yes);
 		stubNode.logMessage(firstTimeout);
 
-		// second node connects to first and third, but third isn't up yet
-		secondNode.addConnection(oneToTwo.getConnectionToAID());
-		secondNode.addConnection(twoToThree.getConnectionToBID());
+		// second node connects to first and third, although third isn't up yet
+		secondNode.addConnection(twoToOne);
+        secondNode.addConnection(twoToThree);
 
         secondNode.setDtLog(stubNode.getDtLog());
         secondNode.recoverFromDtLog();
-		ParticipantRecoveryStateMachine secondSM = (ParticipantRecoveryStateMachine)secondNode.getStateMachine();
+
+        ParticipantRecoveryStateMachine secondSM = (ParticipantRecoveryStateMachine)secondNode.getStateMachine();
+
         // second node sends decision_req to first node, and first node replies with in_recovery
-		assertTrue(firstSM.receiveMessage(oneToTwo.getConnectionToBID()));
-		assertTrue(secondSM.receiveMessage(oneToTwo.getConnectionToAID()));
+		assertTrue(firstSM.receiveMessage(oneToTwo));
+		assertTrue(secondSM.receiveMessage(twoToOne));
+
         // verify second node's recovery set
 		Collection<Integer> secondRecoveredSet = secondSM.getRecoveredProcesses();
 		assertEquals(2, secondRecoveredSet.size());
 		assertTrue(secondRecoveredSet.contains(1));
 		assertTrue(secondRecoveredSet.contains(2));
+
         // second node sends decision_req to third node, which times out
-        twoToThree.getConnectionToBID().getOutQueue().clear();	// remove the message so it isn't received later
-        twoToThree.getConnectionToAID().sendMessage(new PeerTimeout(3));
-		assertTrue(secondNode.getStateMachine().receiveMessage(twoToThree.getConnectionToBID()));
+        twoToThree.getOutQueue().clear();	// remove the message so it isn't received later
+        threeToTwo.sendMessage(new PeerTimeout(3));
+		assertTrue(secondNode.getStateMachine().receiveMessage(twoToThree));
+
 		// second node sends decision_req to first node
-		oneToTwo.getConnectionToAID().getOutQueue().clear();	// remove the message so it isn't received later
+        assertTrue(twoToOne.getOutQueue().peek() instanceof DecisionRequest);
+		twoToOne.getOutQueue().clear();	// remove the message so it isn't received later
+
         // second node is now waiting for a coordinator; check its up set
 		Collection<Integer> secondUpSetIntersection = secondSM.getUpSetIntersection();
 		assertEquals(2, secondUpSetIntersection.size());
@@ -139,34 +160,42 @@ public class FailureRecoveryTest extends TestCommon {
 		stubNode.logMessage(secondTimeout);
 
 		// third node connects to first and second
-		thirdNode.addConnection(twoToThree.getConnectionToAID());
-		thirdNode.addConnection(oneToThree.getConnectionToAID());
+		thirdNode.addConnection(threeToTwo);
+		thirdNode.addConnection(threeToOne);
 
         thirdNode.setDtLog(stubNode.getDtLog());
         thirdNode.recoverFromDtLog();
+
         // third node sends decision_req to first node, and first node replies with in_recovery
-		assertTrue(firstNode.getStateMachine().receiveMessage(oneToThree.getConnectionToBID()));
-		assertTrue(thirdNode.getStateMachine().receiveMessage(oneToThree.getConnectionToAID()));
+		assertTrue(firstNode.getStateMachine().receiveMessage(oneToThree));
+		assertTrue(thirdNode.getStateMachine().receiveMessage(threeToOne));
+
         // third node sends decision_req to second node, and second node replies with in_recovery
-		assertTrue(secondNode.getStateMachine().receiveMessage(twoToThree.getConnectionToBID()));
-		assertTrue(thirdNode.getStateMachine().receiveMessage(twoToThree.getConnectionToAID()));
+		assertTrue(secondNode.getStateMachine().receiveMessage(twoToThree));
+		assertTrue(thirdNode.getStateMachine().receiveMessage(threeToTwo));
+
         // third node now sends ur_elected to first node, and changes to participant recovery state
-		assertTrue(firstNode.getStateMachine().receiveMessage(oneToThree.getConnectionToBID()));
+		assertTrue(firstNode.getStateMachine().receiveMessage(oneToThree));
+
 		// first node is now in coordinator termination protocol, and sends state_request to second and third nodes
 		assertTrue(firstNode.getStateMachine() instanceof CoordinatorStateMachine);
-		assertTrue(secondNode.getStateMachine().receiveMessage(oneToTwo.getConnectionToAID()));
-		assertTrue(thirdNode.getStateMachine().receiveMessage(oneToThree.getConnectionToAID()));
+		assertTrue(secondNode.getStateMachine().receiveMessage(twoToOne));
+		assertTrue(thirdNode.getStateMachine().receiveMessage(threeToOne));
+
 		// second and third nodes are now in participant recovery mode
 		assertTrue(secondNode.getStateMachine() instanceof ParticipantStateMachine);
 		assertTrue(thirdNode.getStateMachine() instanceof ParticipantStateMachine);
-		// second node sends Yes to first node
-		assertTrue(firstNode.getStateMachine().receiveMessage(oneToTwo.getConnectionToBID()));
-		// third node sends Yes to first node
-		assertTrue(firstNode.getStateMachine().receiveMessage(oneToThree.getConnectionToBID()));
+
+		// second node sends Uncertain to first node
+		assertTrue(firstNode.getStateMachine().receiveMessage(oneToTwo));
+
+		// third node sends Uncertain to first node
+		assertTrue(firstNode.getStateMachine().receiveMessage(oneToThree));
+
 		// first node aborts; sends abort to transaction manager, second and third nodes
-		Message lastToSecond = getLastMessageInQueue(oneToTwo.getConnectionToBID().getOutQueue());
+		Message lastToSecond = getLastMessageInQueue(oneToTwo.getOutQueue());
 		assertEquals(Command.ABORT, lastToSecond.getCommand());
-		Message lastToThird = getLastMessageInQueue(oneToThree.getConnectionToBID().getOutQueue());
+		Message lastToThird = getLastMessageInQueue(oneToThree.getOutQueue());
 		assertEquals(Command.ABORT, lastToThird.getCommand());
 		Message lastToTxnMgr = getLastMessageInQueue(txnMgrQueueSockets[0].getConnectionToBID().getOutQueue());
 		assertEquals(Command.ABORT, lastToTxnMgr.getCommand());

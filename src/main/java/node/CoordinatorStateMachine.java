@@ -16,6 +16,7 @@ import system.failures.PartialBroadcast;
 import system.network.Connection;
 import util.Common;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.stream.Collectors;
@@ -275,23 +276,26 @@ public class CoordinatorStateMachine extends StateMachine {
     }
 
 	private void setupTransactionConnectionsAndSendMessage(Message message,
-			final Collection<PeerReference> peerSet) {
+                                                           final Collection<PeerReference> peerSet)
+    {
         Collection<Connection> conns = new ArrayList<>();
 
 		/* connect to every peer the ownerNode is not already connected to */
 		for (PeerReference reference : peerSet) {
+            /* start timers on everyone */
+            ownerNode.resetTimersFor(reference.getNodeID());
+            Connection conn = null;
+            try {
+                conn = ownerNode.getOrConnectToPeer(reference);
+                if (conn != null) {
+                    conns.add(conn);
+                    ownerNode.send(conn, message);
+                }
+            }
+            catch (IOException e) {
+                System.err.println(ownerNode.getMyNodeID()+" couldn't send message to "+reference.getNodeID());
+            }
 
-		    Connection conn = ownerNode.isConnectedTo(reference)
-		                      ? ownerNode.getPeerConnForId(reference.nodeID)
-		                      : ownerNode.connectTo(reference);
-
-		    if (conn != null) {
-			    conns.add(conn);
-			    ownerNode.send(conn, message);
-
-			    /* start timers on everyone */
-			    ownerNode.resetTimersFor(reference.getNodeID());
-		    }
 		}
 		txnConnections = conns;
 	}

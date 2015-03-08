@@ -5,7 +5,6 @@ import messages.DelayMessage;
 import messages.InRecoveryResponse;
 import messages.Message;
 import messages.Message.Command;
-import messages.PeerTimeout;
 import messages.UncertainResponse;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
@@ -13,6 +12,7 @@ import node.base.StateMachine;
 import system.network.Connection;
 import util.Common;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
@@ -64,17 +64,17 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 	@Override
     public synchronized boolean receiveMessage(Connection overConnection, Message message) {
         int receiverID = overConnection.getReceiverID();
+        ownerNode.cancelTimersFor(overConnection.getReceiverID());
 
         if (!message.getCommand().equals(Command.TIMEOUT) && receiverID > 0) {
             recoveredProcesses.add(receiverID);
-            ownerNode.cancelTimersFor(overConnection.getReceiverID());
         }
         else {
             recoveredProcesses.remove(receiverID);
         }
 
-        System.out.println("ParticipantInRec "+ownerNode.getMyNodeID()+" received a "+message.getCommand()+" from "+overConnection
-                .getReceiverID());
+        System.out.println("ParticipantInRec "+ownerNode.getMyNodeID()+"" +" received a "+
+                           message.getCommand()+" from "+overConnection.getReceiverID());
         switch (message.getCommand()) {
 
             case COMMIT:
@@ -103,7 +103,6 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
                 break;
 
             case TIMEOUT:
-                System.out.println("ParticipantInRec "+ownerNode.getMyNodeID()+" timed out on "+((PeerTimeout)message).getPeerId());
                 advanceToNextProcessOrRewind();
                 break;
 
@@ -195,18 +194,16 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 
     public void sendDecisionRequestToCurrentPeer() {
         PeerReference current = sortedPeers.get(currentPeerIndex);
-        Connection currentPeerConnection = ownerNode.isConnectedTo(current)
-                ? ownerNode.getPeerConnForId(current.getNodeID())
-                : ownerNode.connectTo(current);
-
-        System.out.println("Node "+ownerNode.getMyNodeID()+" adding timer for "+current.getNodeID());
-        ownerNode.addTimerFor(current.getNodeID());
-        if (currentPeerConnection.isReady()) {
-            System.out.println("Node "+ownerNode.getMyNodeID()+": sending DEC_REC to "+current.getNodeID());
+        try {
+//            System.out.println("Node "+ownerNode.getMyNodeID()+" adding timer for "+current.getNodeID());
+//            System.out.println("Node "+ownerNode.getMyNodeID()+": sending DEC_REC to "+current.getNodeID());
+            Connection currentPeerConnection = ownerNode.getOrConnectToPeer(current);
+            ownerNode.addTimerFor(current.getNodeID());
             ownerNode.send(currentPeerConnection, new DecisionRequest(uncommitted.getTransactionID()));
         }
-        else {
-            System.out.println("Node "+ownerNode.getMyNodeID()+": could not send DEC_REC to "+current.getNodeID());
+        catch (IOException e) {
+            System.err.println("Node "+ownerNode.getMyNodeID()+": " +
+                               "could not send DEC_REC to "+current.getNodeID());
         }
 	}
 
@@ -219,8 +216,14 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 			try {
 				Thread.sleep(1000);
 			} catch (InterruptedException e) {
-				e.printStackTrace();
-			}
+                System.err.println("Node "+ownerNode.getMyNodeID()+"'s wheel-clock was interrupted by node timer");
+                try {
+                    Thread.sleep(300);
+                }
+                catch (InterruptedException e1) {
+                    e1.printStackTrace();
+                }
+            }
 			resetToNoInformation();
 			sendDecisionRequestToCurrentPeer();
 		}
