@@ -16,8 +16,6 @@ import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
-import node.system.SyncNode;
-import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.network.Connection;
 import util.Common;
 
@@ -110,7 +108,7 @@ public class ParticipantStateMachine extends StateMachine {
                     break;
 
                 case DECISION_REQUEST:
-                	Message decision = node.getDecisionFor(msg.getTransactionID());
+                	Message decision = ownerNode.getDecisionFor(msg.getTransactionID());
                 	if (decision != null) {
                 		overConnection.sendMessage(decision);
                 	}
@@ -121,7 +119,7 @@ public class ParticipantStateMachine extends StateMachine {
                 		overConnection.sendMessage(new UncertainResponse(msg.getTransactionID()));
                 	}
                 	break;
-                	
+
                 case STATE_REQUEST:
                     ownerNode.getUpSet().removeIf(n -> n.getNodeID() < overConnection.getReceiverID());
                     coordinatorId = overConnection.getReceiverID();
@@ -165,9 +163,16 @@ public class ParticipantStateMachine extends StateMachine {
 	}
 
     private void receiveUR_ELECTED(Message message) {
-        ownerNode.getUpSet().removeIf(n -> n.getNodeID() < ownerNode.getMyNodeID());
-        ownerNode = new SyncNode(3, null);
-        ownerNode.becomeCoordinatorInRecovery(action, precommitted);
+        if (action == null) {
+            /* decision was already reached */
+            final Message decision = ownerNode.getDecisionFor(message.getTransactionID());
+            currentConnection.sendMessage(decision);
+            ownerNode.sendTxnMgrMsg(decision);
+        }
+        else {
+            ownerNode.getUpSet().removeIf(n -> n.getNodeID() < ownerNode.getMyNodeID());
+            ownerNode.becomeCoordinatorInRecovery(action, precommitted);
+        }
     }
 
     private void receiveAbort(Message message) {
@@ -175,6 +180,7 @@ public class ParticipantStateMachine extends StateMachine {
         action = null;
         setPeerSet(null);
         ownerNode.setUpSet(null);
+        setOngoingTransactionID(NO_ONGOING_TRANSACTION);
     }
 
     private void receiveDubCoordinator(Message message) {
@@ -216,11 +222,11 @@ public class ParticipantStateMachine extends StateMachine {
         ownerNode.logMessage(commitRequest);
         ownerNode.applyActionToVolatileStorage(action);
         setOngoingTransactionID(NO_ONGOING_TRANSACTION);
+        action = null;
     }
 
     public void respondNOToVoteRequest(Message message) {
-        setOngoingTransactionID(NO_ONGOING_TRANSACTION);
-        ownerNode.logMessage(new AbortRequest(message.getTransactionID()));
+        receiveAbort(new AbortRequest(message.getTransactionID()));
         ownerNode.send(currentConnection, new NoResponse(message));
     }
 

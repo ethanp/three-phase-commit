@@ -57,7 +57,7 @@ public class AsynchronousSystemTest extends TestCommon {
         peerReferences = nodes.stream()
                               .map(mgrNode -> mgrNode.asPeerNode())
                               .collect(Collectors.toList());
-        while (system.txnMgr.coordinator == null) {
+        while (system.txnMgr.getCoordinator() == null) {
             system.txnMgr.coordinatorChosen.await();
         }
         System.out.println("JUnit test thinks a coordinator has been chosen");
@@ -293,6 +293,19 @@ public class AsynchronousSystemTest extends TestCommon {
     public void testCoordinatorFailsCommitToTwo() throws Exception {
         String cmdStr = "add a_song a_url -partialCommit 2 1";
         ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
+        assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
+
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);
+        for (int i = 1; i <= 5; i++) {
+            assertLogContains(i, COMMIT, TXID);
+        }
+        system.killAllNodes();
+    }
+
+    @Test
+    public void testCoordinatorFailsCommitToAll() throws Exception {
+        String cmdStr = "add a_song a_url -partialCommit 4 1";
+        ConsoleCommand command = new ConsoleCommand(cmdStr, system.getTxnMgr().getNextTransactionID());
         assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
 
         Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);

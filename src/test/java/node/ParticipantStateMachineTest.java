@@ -336,7 +336,7 @@ public class ParticipantStateMachineTest extends TestCommon {
         testReceiveFromCoordinator(msg);
 
         /* assert correct resulting state */
-        assertEquals(TXID, participantSM.getOngoingTransactionID());
+        assertEquals(NO_ONGOING_TRANSACTION, participantSM.getOngoingTransactionID());
         assertNull(participantSM.getAction());
         assertNull(participantSM.getPeerSet());
         assertNull(participantUnderTest.getUpSet());
@@ -397,14 +397,14 @@ public class ParticipantStateMachineTest extends TestCommon {
         testReceiveFromCoordinator(new DubCoordinatorMessage());
         assertTrue(participantUnderTest.getStateMachine() instanceof CoordinatorStateMachine);
     }
-    
+
     @Test
     public void testReceiveDecisionRequest_decisionAlreadyLogged_repliesWithDecision() {
         final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
         participantUnderTest.logMessage(action);
         participantUnderTest.logMessage(new YesResponse(action));
         participantUnderTest.logMessage(new CommitRequest(TXID));
-        
+
         testReceiveFromCoordinator(new DecisionRequest(TXID));
         Message last = getLastMessageInQueue(peerToCoordinator.getOutQueue());
         assertEquals(Command.COMMIT, last.getCommand());
@@ -417,12 +417,12 @@ public class ParticipantStateMachineTest extends TestCommon {
         participantUnderTest.logMessage(new YesResponse(action));
         participantSM.setOngoingTransactionID(TXID);
         participantSM.setPrecommitted(true);
-        
+
         testReceiveFromCoordinator(new DecisionRequest(TXID));
         Message last = getLastMessageInQueue(peerToCoordinator.getOutQueue());
         assertEquals(Command.PRE_COMMIT, last.getCommand());
     }
-    
+
     @Test
     public void testReceiveDecisionRequest_uncertain_repliesWithUncertain() {
         final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
@@ -430,7 +430,7 @@ public class ParticipantStateMachineTest extends TestCommon {
         participantUnderTest.logMessage(new YesResponse(action));
         participantSM.setOngoingTransactionID(TXID);
         participantSM.setPrecommitted(false);
-        
+
         testReceiveFromCoordinator(new DecisionRequest(TXID));
         Message last = getLastMessageInQueue(peerToCoordinator.getOutQueue());
         assertEquals(Command.UNCERTAIN, last.getCommand());

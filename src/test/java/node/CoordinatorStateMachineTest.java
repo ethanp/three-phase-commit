@@ -8,17 +8,13 @@ import messages.Message;
 import messages.NoResponse;
 import messages.PeerTimeout;
 import messages.YesResponse;
-import messages.Message.Command;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
-import node.CoordinatorStateMachine.CoordinatorState;
 import node.system.SyncNode;
-
 import org.junit.Before;
 import org.junit.Test;
-
 import system.network.QueueConnection;
 import system.network.QueueSocket;
 import util.Common;
@@ -141,7 +137,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 	}
 
 	private void startInTerminationProtocol(VoteRequest action) {
-		syncNode.becomeCoordinatorInRecovery(action);
+		syncNode.becomeCoordinatorInRecovery(action, false);
 		csm = (CoordinatorStateMachine) syncNode.getStateMachine();
 	}
 
@@ -156,7 +152,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		voteReq = getLastMessageToPeer(1);
 		assertEquals(request, voteReq);
 		Message logged = getLastMessageLogged();
-		assertTrue(logged instanceof AddRequest);
+		assertTrue(logged instanceof YesResponse);
 	}
 
 	@Test
@@ -165,7 +161,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		peerRespondsWithYes(0);
 
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForVotes,
-				csm.getState());
+                     csm.getState());
 	}
 
 	@Test
@@ -175,7 +171,7 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		peerRespondsWithYes(1);
 
 		assertEquals(CoordinatorStateMachine.CoordinatorState.WaitingForAcks,
-				csm.getState());
+                     csm.getState());
 		Message precommit = getLastMessageToPeer(0);
 		assertEquals(Message.Command.PRE_COMMIT, precommit.getCommand());
 		precommit = getLastMessageToPeer(1);
@@ -188,8 +184,8 @@ public class CoordinatorStateMachineTest extends TestCommon {
 		peerTimesOut(0);
 
 		assertEquals(
-				CoordinatorStateMachine.CoordinatorState.WaitingForCommand,
-				csm.getState());
+                CoordinatorStateMachine.CoordinatorState.WaitingForCommand,
+                csm.getState());
 		Message abort = getLastMessageToPeer(1);
 		assertEquals(Message.Command.ABORT, abort.getCommand());
 		abort = getLastMesageToTxnMgr();

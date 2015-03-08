@@ -19,7 +19,7 @@ public abstract class TransactionManager {
 
     protected List<ManagerNodeRef> nodes;
     protected Network network;
-    protected ManagerNodeRef coordinator;
+    private ManagerNodeRef coordinator;
     protected int currentTxnID;
 
     public TransactionManager(int numNodes) {
@@ -48,11 +48,12 @@ public abstract class TransactionManager {
     }
 
     public void processRequest(VoteRequest voteRequest) {
-        coordinator.sendMessage(voteRequest);
+        dubCoordinator(1);
+        getCoordinator().sendMessage(voteRequest);
     }
 
     public void sendCoordinator(Message message) {
-        coordinator.sendMessage(message);
+        getCoordinator().sendMessage(message);
     }
 
     public void send(int nodeID, Message message) {
@@ -62,10 +63,18 @@ public abstract class TransactionManager {
     public void dubCoordinator(int nodeID) {
         final ManagerNodeRef newCoord = remoteNodeWithID(nodeID);
         newCoord.sendMessage(new DubCoordinatorMessage());
-        coordinator = newCoord;
+        setCoordinator(newCoord);
     }
 
     public ManagerNodeRef getNodeByID(int nodeID) {
         return getNodes().stream().filter(n -> n.getNodeID() == nodeID).findFirst().get();
+    }
+
+    public ManagerNodeRef getCoordinator() {
+        return coordinator;
+    }
+
+    public void setCoordinator(ManagerNodeRef coordinator) {
+        this.coordinator = coordinator;
     }
 }

@@ -1,5 +1,6 @@
 package system;
 
+import messages.DecisionRequest;
 import messages.Message;
 import messages.NodeMessage;
 import node.system.ConnectionListener;
@@ -20,6 +21,7 @@ public class TxnMgrServer implements Runnable, MessageReceiver {
     AsyncTxnMgr txnMgr;
     ServerSocket serverSocket;
     static int requestPort = 3000;
+    private boolean waitForCoordinatorToReconnectThenSendDecisionRequest = false;
 
     public int getListenPort() {
         return serverSocket.getLocalPort();
@@ -42,6 +44,10 @@ public class TxnMgrServer implements Runnable, MessageReceiver {
                     txnMgr.allNodesConnected.signalAll();
                 }
                 txnMgr.nodesConnected.unlock();
+
+                if (waitForCoordinatorToReconnectThenSendDecisionRequest) {
+                    txnMgr.sendCoordinator(new DecisionRequest(txnMgr.getTransactionID()));
+                }
             }
             catch (IOException | InterruptedException e) {
                 e.printStackTrace();
@@ -79,11 +85,18 @@ public class TxnMgrServer implements Runnable, MessageReceiver {
     @Override public boolean receiveMessageFrom(Connection connection, int msgsRcvd) {
         try {
             final Message message = connection.receiveMessage();
+            final int nodeID = connection.getReceiverID();
             if (message == null) {
-                System.err.println("TxnMgrServer received a null message from "+connection.getReceiverID());
+                System.err.println("TxnMgrServer received a null message from "+nodeID);
+                txnMgr.reviveNode(nodeID);
+
+                /* if it was the coordinator who died, */
+                if (nodeID == txnMgr.getCoordinator().getNodeID() && txnMgr.getTransactionResult() == null) {
+                    waitForCoordinatorToReconnectThenSendDecisionRequest = true;
+                }
             }
             else {
-                System.out.println("mgr rcvd a "+message.getCommand()+" from node "+connection.getReceiverID());
+                System.out.println("mgr rcvd a "+message.getCommand()+" from node "+nodeID);
                 txnMgr.receiveResponse(message);
             }
         }

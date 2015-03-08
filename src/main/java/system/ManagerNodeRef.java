@@ -11,7 +11,7 @@ import java.io.EOFException;
  * Ethan Petuchowski 2/16/15
  */
 public class ManagerNodeRef {
-    protected int nodeID;
+    private int nodeID;
     protected Connection conn;
     protected int listenPort;
 

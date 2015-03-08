@@ -89,7 +89,7 @@ public class CoordinatorStateMachine extends StateMachine {
 
         synchronized (this) {
             System.out.println("Coordinator "+ownerNode.getMyNodeID()+" "+
-                               "received a "+message.getCommand());
+                               "received a "+message.getCommand()+" from "+overConnection.getReceiverID());
 
             switch (message.getCommand()) {
                 case ADD:
@@ -198,7 +198,12 @@ public class CoordinatorStateMachine extends StateMachine {
                     Common.MESSAGE_DELAY = ((DelayMessage) message).getDelaySec()*1000;
                     break;
 
+                case DUB_COORDINATOR:
+                    /* ignore */
+                    break;
+
                 case UR_ELECTED:
+                    ownerNode.send(overConnection, ownerNode.getDecisionFor(message.getTransactionID()));
                     break;
 
                 default:
