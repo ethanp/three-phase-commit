@@ -176,7 +176,7 @@ public class AsynchronousSystemTest extends TestCommon {
     }
 
     @Test
-    public void testParticipantFailsAfterSendingNO_txnCommits() throws Exception {
+    public void testParticipantFailsAfterSendingNO_txnAborts() throws Exception {
         /* this is already implementable
 
             Start up the system (happens in @Before)
@@ -221,7 +221,7 @@ public class AsynchronousSystemTest extends TestCommon {
     }
 
     @Test
-    public void testCoordinatorFailsAfterSendingPrecommitToAll() throws Exception {
+    public void testCoordinatorFailsAfterSendingPrecommitToTwo() throws Exception {
 
         /* what SHOULD happen
 
@@ -266,6 +266,32 @@ public class AsynchronousSystemTest extends TestCommon {
          */
 
         String cmdStr = "add a_song a_url -partialPrecommit 2 1";
+        ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
+        assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
+
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);
+        for (int i = 1; i <= 5; i++) {
+            assertLogContains(i, COMMIT, TXID);
+        }
+        system.killAllNodes();
+    }
+
+    @Test
+    public void testCoordinatorFailsPrecommitToAll() throws Exception {
+        String cmdStr = "add a_song a_url -partialPrecommit 4 1";
+        ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
+        assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
+
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);
+        for (int i = 1; i <= 5; i++) {
+            assertLogContains(i, COMMIT, TXID);
+        }
+        system.killAllNodes();
+    }
+
+    @Test
+    public void testCoordinatorFailsCommitToTwo() throws Exception {
+        String cmdStr = "add a_song a_url -partialCommit 2 1";
         ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
         assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
 

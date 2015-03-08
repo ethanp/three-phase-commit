@@ -12,7 +12,7 @@ import java.util.Collection;
  */
 public abstract class StateMachine {
     private Collection<PeerReference> peerSet = null;
-    protected final Node ownerNode;
+    protected Node ownerNode;
 
     protected StateMachine(Node node) {
         ownerNode = node;

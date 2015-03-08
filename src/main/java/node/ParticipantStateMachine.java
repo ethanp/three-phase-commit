@@ -16,6 +16,7 @@ import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
+import node.system.SyncNode;
 import sun.reflect.generics.reflectiveObjects.NotImplementedException;
 import system.network.Connection;
 import util.Common;
@@ -112,7 +113,9 @@ public class ParticipantStateMachine extends StateMachine {
                 case DECISION_REQUEST:
                     throw new NotImplementedException();
                 case STATE_REQUEST:
-                	Message m, lastLogged = lastLoggedMessage();
+                    ownerNode.getUpSet().removeIf(n -> n.getNodeID() < overConnection.getReceiverID());
+                    coordinatorId = overConnection.getReceiverID();
+                    Message m, lastLogged = lastLoggedMessage();
                 	if (lastLogged == null) {
                 		m = new AbortRequest(Common.NO_ONGOING_TRANSACTION);
                 	}
@@ -152,9 +155,8 @@ public class ParticipantStateMachine extends StateMachine {
 	}
 
     private void receiveUR_ELECTED(Message message) {
-        for (int i = 1; i < ownerNode.getMyNodeID(); i++) {
-            removeFromUpset(i);
-        }
+        ownerNode.getUpSet().removeIf(n -> n.getNodeID() < ownerNode.getMyNodeID());
+        ownerNode = new SyncNode(3, null);
         ownerNode.becomeCoordinatorInRecovery(action, precommitted);
     }
 
