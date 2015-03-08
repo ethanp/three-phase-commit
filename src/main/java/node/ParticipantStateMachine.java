@@ -19,6 +19,7 @@ import node.base.StateMachine;
 import system.network.Connection;
 import util.Common;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.PriorityQueue;
 import java.util.stream.Collectors;
@@ -70,7 +71,7 @@ public class ParticipantStateMachine extends StateMachine {
                         break;
                     case ABORT:
                     case COMMIT:
-                        ownerNode.cancelTimersFor(currentConnection.getReceiverID());
+                        ownerNode.cancelAllTimers();
                         break;
                 }
             }
@@ -112,15 +113,20 @@ public class ParticipantStateMachine extends StateMachine {
 
                 case DECISION_REQUEST:
                 	Message decision = ownerNode.getDecisionFor(msg.getTransactionID());
-                	if (decision != null) {
-                		overConnection.sendMessage(decision);
-                	}
-                	else if (msg.getTransactionID() == ongoingTransactionID && precommitted) {
-                		overConnection.sendMessage(new PrecommitRequest(ongoingTransactionID));
-                	}
-                	else {
-                		overConnection.sendMessage(new UncertainResponse(msg.getTransactionID()));
-                	}
+                    try {
+                        if (decision != null) {
+                            overConnection.sendMessage(decision);
+                        }
+                        else if (msg.getTransactionID() == ongoingTransactionID && precommitted) {
+                            overConnection.sendMessage(new PrecommitRequest(ongoingTransactionID));
+                        }
+                        else {
+                            overConnection.sendMessage(new UncertainResponse(msg.getTransactionID()));
+                        }
+                    }
+                    catch (IOException e) {
+                        ownerNode.log("Unable to reply to "+overConnection.getReceiverID());
+                    }
                 	break;
 
                 case STATE_REQUEST:
@@ -136,8 +142,13 @@ public class ParticipantStateMachine extends StateMachine {
                 	else {
                 		m = precommitted ? new PrecommitRequest(ongoingTransactionID) : new UncertainResponse(action.getTransactionID());
                 	}
-                	overConnection.sendMessage(m);
-                	break;
+                    try {
+                        overConnection.sendMessage(m);
+                    }
+                    catch (IOException e) {
+                        forceTimeoutBcBrokenConn(overConnection);
+                    }
+                    break;
 
                 /* SET FAIL-CASE OR DELAY */
                 case PARTIAL_BROADCAST:
@@ -158,6 +169,12 @@ public class ParticipantStateMachine extends StateMachine {
         return true;
     }
 
+    private void forceTimeoutBcBrokenConn(Connection conn) {
+        ownerNode.cancelTimersFor(conn.getReceiverID());
+        onTimeout(new PeerTimeout(conn.getReceiverID()));
+        ownerNode.getPeerConns().remove(conn);
+    }
+
     Message lastLoggedMessage() {
     	List<Message> loggedMessages = ownerNode.getDtLog().getLoggedMessages().stream().collect(Collectors.toList());
 		int s = loggedMessages.size();
@@ -168,7 +185,12 @@ public class ParticipantStateMachine extends StateMachine {
         if (action == null) {
             /* decision was already reached */
             final Message decision = ownerNode.getDecisionFor(message.getTransactionID());
-            currentConnection.sendMessage(decision);
+            try {
+                currentConnection.sendMessage(decision);
+            }
+            catch (IOException e) {
+                /* ignore */
+            }
             ownerNode.sendTxnMgrMsg(decision);
         }
         else {
@@ -219,7 +241,12 @@ public class ParticipantStateMachine extends StateMachine {
      */
     private void receivePrecommit(PrecommitRequest precommitRequest) {
         setPrecommitted(true);
-        ownerNode.send(currentConnection, new AckRequest(getOngoingTransactionID()));
+        try {
+            ownerNode.send(currentConnection, new AckRequest(getOngoingTransactionID()));
+        }
+        catch (IOException e) {
+            forceTimeoutBcBrokenConn(currentConnection);
+        }
     }
 
     private void receiveCommit(CommitRequest commitRequest) {
@@ -231,7 +258,12 @@ public class ParticipantStateMachine extends StateMachine {
 
     public void respondNOToVoteRequest(Message message) {
         receiveAbort(new AbortRequest(message.getTransactionID()));
-        ownerNode.send(currentConnection, new NoResponse(message));
+        try {
+            ownerNode.send(currentConnection, new NoResponse(message));
+        }
+        catch (IOException e) {
+            forceTimeoutBcBrokenConn(currentConnection);
+        }
     }
 
     private void respondYESToVoteRequest(VoteRequest voteRequest) {
@@ -240,12 +272,14 @@ public class ParticipantStateMachine extends StateMachine {
         setPeerSet(voteRequest.getCloneOfPeerSet());
         ownerNode.setUpSet(voteRequest.getCloneOfPeerSet());
         ownerNode.resetTimersFor(currentConnection.getReceiverID());
-        logAndSendMessage(new YesResponse(voteRequest));
-    }
-
-    public void logAndSendMessage(Message message) {
-        ownerNode.logMessage(message);
-        ownerNode.send(currentConnection, message);
+        final YesResponse response = new YesResponse(voteRequest);
+        ownerNode.logMessage(response);
+        try {
+            ownerNode.send(currentConnection, response);
+        }
+        catch (IOException e) {
+            forceTimeoutBcBrokenConn(currentConnection);
+        }
     }
 
     /* Getters and Setters */
@@ -279,7 +313,6 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     private void onTimeout(PeerTimeout timeout) {
-        System.out.println("Timed-out on "+timeout.getPeerId());
         if (timeout.getPeerId() == coordinatorId) {
 	    	ownerNode.logMessage(timeout);
 	        removeFromUpset(timeout.getPeerId());

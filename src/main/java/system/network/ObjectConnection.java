@@ -59,19 +59,9 @@ public class ObjectConnection extends Connection {
         return null;
     }
 
-    @Override public void sendMessage(Message o) {
-        if (isReady()) {
-            try {
-                out.writeObject(o);
-                out.flush();
-            }
-            catch (IOException ignored) {
-                System.err.println("Failed to send message to "+getReceiverID());
-            }
-        }
-        else {
-            System.err.println("Socket to "+getReceiverID()+" is not write-to-able");
-        }
+    @Override public void sendMessage(Message o) throws IOException {
+        out.writeObject(o);
+        out.flush();
     }
 
     public boolean isReady() {

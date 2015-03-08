@@ -54,9 +54,15 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 				.collect(Collectors.toList());
 
 		originalUpSet = new HashSet<Integer>();
-		for (PeerReference peerRef : lastUpSet) {
+        for (PeerReference peerRef : lastUpSet) {
 			originalUpSet.add(peerRef.getNodeID());
 		}
+
+        StringBuilder sb1 = new StringBuilder();
+        sortedPeers.forEach(p -> sb1.append(p.getNodeID()+" "));
+        StringBuilder sb2 = new StringBuilder();
+        originalUpSet.forEach(p -> sb2.append(p+" "));
+        ownerNode.log("Starting with peers "+sb1.toString()+" and upset "+sb2.toString());
 
 		resetToNoInformation();
 	}
@@ -146,12 +152,23 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
                 }
                 break;
             case DECISION_REQUEST:
-                ownerNode.send(overConnection, new InRecoveryResponse(uncommitted.getTransactionID(), originalUpSet));
+                try {
+                    ownerNode.send(overConnection, new InRecoveryResponse(uncommitted.getTransactionID(), originalUpSet));
+                }
+                catch (IOException e) {
+                    ownerNode.getPeerConns().remove(overConnection);
+                }
                 break;
             case STATE_REQUEST:
-                ownerNode.send(overConnection, new UncertainResponse(uncommitted.getTransactionID()));
-                ownerNode.becomeParticipantInRecovery(uncommitted, false);
-                ownerNode.resetTimersFor(overConnection.getReceiverID());
+                try {
+                    ownerNode.send(overConnection, new UncertainResponse(uncommitted.getTransactionID()));
+                    ownerNode.becomeParticipantInTerminationProtocol(uncommitted, false);
+                    ownerNode.resetTimersFor(overConnection.getReceiverID());
+                }
+                catch (IOException e) {
+                    ownerNode.getPeerConns().remove(overConnection);
+                }
+
                 break;
             case UR_ELECTED:
                 updateNodeUpSet();
@@ -194,11 +211,12 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 
     public void sendDecisionRequestToCurrentPeer() {
         PeerReference current = sortedPeers.get(currentPeerIndex);
+        System.out.println("Node "+ownerNode.getMyNodeID()+": sending DEC_REC to "+current.getNodeID());
+        ownerNode.resetTimersFor(current.getNodeID());
         try {
 //            System.out.println("Node "+ownerNode.getMyNodeID()+" adding timer for "+current.getNodeID());
-//            System.out.println("Node "+ownerNode.getMyNodeID()+": sending DEC_REC to "+current.getNodeID());
             Connection currentPeerConnection = ownerNode.getOrConnectToPeer(current);
-            ownerNode.addTimerFor(current.getNodeID());
+            ownerNode.log("obtained conn to "+current.getNodeID());
             ownerNode.send(currentPeerConnection, new DecisionRequest(uncommitted.getTransactionID()));
         }
         catch (IOException e) {

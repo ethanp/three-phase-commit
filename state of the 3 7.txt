@@ -1,6 +1,0 @@
-1. In `testFutureCoordinatorFailure`, 1 in recovery adds timers and they don't
-   time out (on 2 which is down at the time), and so it doesn't keep wheeling
-   and dealing.
-
-2. It seems like maybe there are issues with the ObjectConnections because a
-   few other tests are broken, all of which were passing in the last commit.

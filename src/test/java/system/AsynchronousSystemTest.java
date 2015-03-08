@@ -30,7 +30,6 @@ import static org.hamcrest.CoreMatchers.containsString;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 public class AsynchronousSystemTest extends TestCommon {
     AsynchronousSystem system;
@@ -305,7 +304,6 @@ public class AsynchronousSystemTest extends TestCommon {
 
     @Test
     public void testCoordinatorFailsCommitToAll() throws Exception {
-        fail("This test is broken");
         String cmdStr = "add a_song a_url -partialCommit 4 1";
         ConsoleCommand command = new ConsoleCommand(cmdStr, system.getTxnMgr().getNextTransactionID());
         assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());

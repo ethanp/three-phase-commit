@@ -38,6 +38,8 @@ public class AsyncProcessNode extends Node {
         L = new AsyncLogger(getMyNodeID(), getListenPort());
         new Thread(nodeServer).start();
 
+        recoverFromDtLog();
+
         /* connect to System */
         try {
             final Socket socket = new Socket(Common.LOCALHOST, systemListenPort);
@@ -53,7 +55,6 @@ public class AsyncProcessNode extends Node {
             System.exit(Common.EXIT_FAILURE);
         }
 
-        recoverFromDtLog();
     }
 
     int getListenPort() {

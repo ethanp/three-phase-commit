@@ -49,7 +49,7 @@ public abstract class Node implements MessageReceiver {
     protected Collection<Connection> peerConns = new ArrayList<>();
     private Collection<PeerReference> upSet = null;
 
-    protected PartialBroadcast partialBroadcast = null;
+    public PartialBroadcast partialBroadcast = null;
     protected Collection<DeathAfter> deathAfters = new ArrayList<>();
 
     protected int msgsSent = 0;
@@ -77,16 +77,18 @@ public abstract class Node implements MessageReceiver {
     }
 
     public void log(String s) {
-        System.out.println(getMyNodeID()+": "+s);
+        System.out.println("Node "+getMyNodeID()+": "+s);
     }
 
     public void recoverFromDtLog() {
     	LogRecoveryStateMachine recoveryMachine = new LogRecoveryStateMachine(this);
     	VoteRequest uncommitted = recoveryMachine.getUncommittedRequest();
     	if (uncommitted == null || !recoveryMachine.didVoteYesOnRequest()) {
-    		stateMachine = new ParticipantStateMachine(this);
+            log("starting as participant");
+            stateMachine = new ParticipantStateMachine(this);
     	}
     	else {
+            log("starting as participant in recovery");
     		stateMachine = new ParticipantRecoveryStateMachine(this, uncommitted, recoveryMachine.getLastUpSet());
             ((ParticipantRecoveryStateMachine)stateMachine).sendDecisionRequestToCurrentPeer();
     	}
@@ -210,7 +212,7 @@ public abstract class Node implements MessageReceiver {
         stateMachine = new ParticipantStateMachine(this);
     }
 
-    public void becomeParticipantInRecovery(VoteRequest ongoingAction, boolean precommit) {
+    public void becomeParticipantInTerminationProtocol(VoteRequest ongoingAction, boolean precommit) {
     	stateMachine = ParticipantStateMachine.startInTerminationProtocol(this, ongoingAction, precommit);
     }
 
@@ -223,14 +225,19 @@ public abstract class Node implements MessageReceiver {
     }
 
     public Connection getPeerConnForId(int id) {
-    	return peerConns.stream().filter(c -> c.getReceiverID() == id).findFirst().get();
+    	return peerConns.stream().filter(c -> c.getReceiverID() == id).findFirst().orElse(null);
     }
 
     public void sendTxnMgrMsg(Message message) {
-        send(txnMgrConn, message);
+        try {
+            send(txnMgrConn, message);
+        }
+        catch (IOException e) {
+            log("Couldn't send txn mgr message");
+        }
     }
 
-    public void send(Connection conn, Message message) {
+    public void send(Connection conn, Message message) throws IOException {
         msgsSent++;
         conn.sendMessage(message);
     }
@@ -265,7 +272,6 @@ public abstract class Node implements MessageReceiver {
     }
 
     public void resetTimersFor(int peerID) {
-        System.out.println(getMyNodeID()+": resetting timer for "+peerID);
         timeoutMonitor.resetTimersFor(peerID);
     }
 
@@ -298,9 +304,17 @@ public abstract class Node implements MessageReceiver {
     }
 
     public Connection getOrConnectToPeer(PeerReference peer) throws IOException {
-        Connection connection = isConnectedTo(peer)
-                ? getPeerConnForId(peer.getNodeID())
-                : connectTo(peer);
+        Connection connection = getPeerConnForId(peer.getNodeID());
+        if (connection == null || !connection.isReady()) {
+            if (connection != null) {
+                log("Resetting connection to "+peer.getNodeID());
+                peerConns.remove(connection);
+            }
+            else {
+                log("Connecting for first time to "+peer.getNodeID());
+            }
+            connection = connectTo(peer);
+        }
         return connection;
     }
 
@@ -314,22 +328,6 @@ public abstract class Node implements MessageReceiver {
                                ((DeathAfter)msg).getNumMsgs()+" msgs from "+
                                ((DeathAfter)msg).getFromProc());
         }
-    }
-
-    public void broadcast(Collection<Connection> recipients, Message request) {
-        int i = 0, numBeforeCrash = 1000;
-        if (partialBroadcast != null && partialBroadcast.getStage().equals(request.getCommand())) {
-            numBeforeCrash = partialBroadcast.getCountProcs();
-        }
-        for (Connection connection : recipients) {
-            if (i++ < numBeforeCrash) {
-                send(connection, request);
-            }
-            else {
-                selfDestruct();
-            }
-		}
-        sendTxnMgrMsg(request);
     }
 
     public abstract void selfDestruct();
