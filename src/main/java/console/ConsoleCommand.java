@@ -1,6 +1,7 @@
 package console;
 
 import messages.KillSig;
+import messages.ListCommand;
 import messages.Message;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
@@ -40,6 +41,9 @@ public class ConsoleCommand {
             case "kill":
                 voteRequest = new KillSig(Integer.parseInt(cmdSc.next()));
                 return;
+            case "list":
+                voteRequest = new ListCommand();
+                return;
             default:
                 System.err.println("Unrecognized command");
         }
@@ -48,13 +52,32 @@ public class ConsoleCommand {
         while (cmdSc.hasNext()) {
             switch (cmdSc.next()) {
                 case "-partialCommit":
-                    failureModes.add(new PartialBroadcast(Message.Command.COMMIT, Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next())));
+                    failureModes.add(
+                            new PartialBroadcast(
+                                    Message.Command.COMMIT,
+                                    Integer.parseInt(cmdSc.next()),
+                                    Integer.parseInt(cmdSc.next())));
                     break;
                 case "-partialPrecommit":
-                    failureModes.add(new PartialBroadcast(Message.Command.PRE_COMMIT, Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next())));
+                    failureModes.add(
+                            new PartialBroadcast(
+                                    Message.Command.PRE_COMMIT,
+                                    Integer.parseInt(cmdSc.next()),
+                                    Integer.parseInt(cmdSc.next())));
                     break;
                 case "-deathAfter":
-                    failureModes.add(new DeathAfter(Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next()), Integer.parseInt(cmdSc.next())));
+                    failureModes.add(
+                            new DeathAfter(
+                                    Integer.parseInt(cmdSc.next()),
+                                    Integer.parseInt(cmdSc.next()),
+                                    Integer.parseInt(cmdSc.next())));
+                    break;
+                case "-deathAfterElected":
+                    failureModes.add(
+                            new DeathAfter(
+                                    DeathAfter.ELECTION_DEATH,
+                                    DeathAfter.ELECTION_DEATH,
+                                    Integer.parseInt(cmdSc.next())));
                     break;
                 case "-delay":
                     delay = Integer.parseInt(cmdSc.next());
@@ -64,20 +87,6 @@ public class ConsoleCommand {
                     System.err.println("Invalid command");
                     voteRequest = null;
                     return;
-
-                /* if there's time */
-//                    case "-participantFailure": // e.g. we can have it fail before PRE_COMMIT
-//                        failureModes = new NodeFailure(Role.PARTICIPANT, Message.parseCommand(cmdSc.next())));
-//                        break;
-//                    case "-futureCoordinatorFailure":
-//                        failureModes = new NodeFailure(Role.FUTURE_COORDINATOR, Message.parseCommand(cmdSc.next())));
-//                        break;
-//                    case "-cascadingCoordinatorFailure":
-//                        failureModes = new NodeFailure(Role.CASCADING_COORDINATOR, Message.parseCommand(cmdSc.next())));
-//                        break;
-//                    case "-totalFailure":
-//                        failureModes = new NodeFailure(Role.TOTAL, Message.parseCommand(cmdSc.next())));
-//                        break;
             }
         }
     }

@@ -54,7 +54,7 @@ public abstract class Message implements Serializable {
         IN_RECOVERY,
         PARTIAL_BROADCAST,
         DELAY,
-        DEATH_AFTER;
+        DEATH_AFTER, LIST;
 
         public boolean isDecision() {
             return (this == ABORT) || (this == COMMIT);

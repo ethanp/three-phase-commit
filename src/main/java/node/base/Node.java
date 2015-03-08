@@ -1,5 +1,6 @@
 package node.base;
 
+import messages.DelayMessage;
 import messages.ElectedMessage;
 import messages.Message;
 import messages.PeerTimeout;
@@ -49,8 +50,10 @@ public abstract class Node implements MessageReceiver {
     protected Collection<Connection> peerConns = new ArrayList<>();
     private Collection<PeerReference> upSet = null;
 
+    /* failures */
     public PartialBroadcast partialBroadcast = null;
     protected Collection<DeathAfter> deathAfters = new ArrayList<>();
+    protected boolean deathAfterElected = false;
 
     protected int msgsSent = 0;
 
@@ -85,12 +88,12 @@ public abstract class Node implements MessageReceiver {
     	VoteRequest uncommitted = recoveryMachine.getUncommittedRequest();
     	if (uncommitted == null || !recoveryMachine.didVoteYesOnRequest()) {
             log("starting as participant");
-            stateMachine = new ParticipantStateMachine(this);
+//            stateMachine = new ParticipantStateMachine(this);
     	}
     	else {
             log("starting as participant in recovery");
     		stateMachine = new ParticipantRecoveryStateMachine(this, uncommitted, recoveryMachine.getLastUpSet());
-            ((ParticipantRecoveryStateMachine)stateMachine).sendDecisionRequestToCurrentPeer();
+
     	}
     }
 
@@ -179,7 +182,7 @@ public abstract class Node implements MessageReceiver {
         final int otherEnd = connection.getReceiverID();
         for (DeathAfter deathAfter : deathAfters) {
             if (deathAfter.getFromProc() == otherEnd && msgsRcvd >= deathAfter.getNumMsgs()) {
-                System.out.println(getMyNodeID()+" received too many messages from "+otherEnd);
+                log("Received too many messages from "+otherEnd);
                 selfDestruct();
             }
         }
@@ -193,10 +196,37 @@ public abstract class Node implements MessageReceiver {
         }
         if (message != null) {
             synchronized (this) {
+                switch (message.getCommand()) {
+                    case PARTIAL_BROADCAST:
+                    case DEATH_AFTER:
+                        addFailure(message);
+                        return true;
+                    case DELAY:
+                        Common.MESSAGE_DELAY = ((DelayMessage) message).getDelaySec()*1000;
+                        return true;
+                    case LIST:
+                        listNode();
+                        return true;
+                }
+                try { Thread.sleep(Common.MESSAGE_DELAY); }
+                catch (InterruptedException ignored) {}
+
+                if (message.getCommand() == Message.Command.UR_ELECTED) {
+                    if (deathAfterElected) {
+                        log("I'm not cut out for politics");
+                        selfDestruct();
+                    }
+                }
                 return stateMachine.receiveMessage(connection, message);
             }
         }
         return false;
+    }
+
+    private void listNode() {
+        StringBuilder sb = new StringBuilder("Node "+getMyNodeID()+": ");
+        playlist.forEach(s -> sb.append(s.toLogString()+", "));
+        System.out.println(sb.toString());
     }
 
     public void becomeCoordinator() {
@@ -208,7 +238,7 @@ public abstract class Node implements MessageReceiver {
     }
 
     public void becomeParticipant() {
-        System.out.println("Node "+getMyNodeID()+": becoming participant");
+        log("Becoming participant");
         stateMachine = new ParticipantStateMachine(this);
     }
 
@@ -282,25 +312,37 @@ public abstract class Node implements MessageReceiver {
     public abstract void addTimerFor(int peerID);
 
     public void electNewLeader(VoteRequest ongoingAction, boolean precommitted) {
-    	PeerReference newCoordinator = upSet.stream().min((a, b) -> a.compareTo(b)).get();
-    	if (newCoordinator.getNodeID() == myNodeID) {
-    		becomeCoordinatorInRecovery(ongoingAction, precommitted);
-    	}
-    	else {
-            try {
-                final Connection newCoordConn = getOrConnectToPeer(newCoordinator);
-                newCoordConn.sendMessage(new ElectedMessage(ongoingAction.getTransactionID()));
-                resetTimersFor(newCoordinator.getNodeID());
-                stateMachine = ParticipantStateMachine.startInTerminationProtocol(this, ongoingAction, precommitted);
-                final ParticipantStateMachine participantStateMachine = (ParticipantStateMachine) stateMachine;
-                participantStateMachine.setCoordinatorID(newCoordinator.getNodeID());
-                participantStateMachine.setCoordinatorConnection(newCoordConn);
+        while (true) {
+            if (upSet.isEmpty()) {
+                throw new RuntimeException("Upset should not be empty");
             }
-            catch (IOException e) {
-                System.err.println("Couldn't elect "+newCoordinator.getNodeID()+" bc connection failed");
-
+            PeerReference newCoordinator = upSet.stream().min((a, b) -> a.compareTo(b)).get();
+            if (newCoordinator.getNodeID() == myNodeID) {
+                if (deathAfterElected) {
+                    log("I wouldn't even elect myself.");
+                    selfDestruct();
+                }
+                becomeCoordinatorInRecovery(ongoingAction, precommitted);
+                return;
             }
-    	}
+            else {
+                try {
+                    final Connection newCoordConn = getOrConnectToPeer(newCoordinator);
+                    newCoordConn.sendMessage(new ElectedMessage(ongoingAction.getTransactionID()));
+                    resetTimersFor(newCoordinator.getNodeID());
+                    stateMachine = ParticipantStateMachine.startInTerminationProtocol(this, ongoingAction, precommitted);
+                    final ParticipantStateMachine participantStateMachine = (ParticipantStateMachine) stateMachine;
+                    participantStateMachine.setCoordinatorID(newCoordinator.getNodeID());
+                    participantStateMachine.setCoordinatorConnection(newCoordConn);
+                    return;
+                }
+                catch (IOException e) {
+                    System.err.println("Couldn't elect "+newCoordinator.getNodeID()+" bc connection failed");
+                    sendTxnMgrMsg(new PeerTimeout(newCoordinator.getNodeID()));
+                    upSet.remove(newCoordinator);
+                }
+            }
+        }
     }
 
     public Connection getOrConnectToPeer(PeerReference peer) throws IOException {
@@ -323,10 +365,15 @@ public abstract class Node implements MessageReceiver {
             partialBroadcast = (PartialBroadcast) msg;
         }
         else if (msg instanceof DeathAfter) {
-            deathAfters.add((DeathAfter) msg);
-            System.out.println(getMyNodeID()+" will die after "+
-                               ((DeathAfter)msg).getNumMsgs()+" msgs from "+
-                               ((DeathAfter)msg).getFromProc());
+            final DeathAfter da = (DeathAfter) msg;
+            if (da.getFromProc() == DeathAfter.ELECTION_DEATH) {
+                deathAfterElected = true;
+                log("Will die upon receiving UR_ELECTED");
+            }
+            else {
+                deathAfters.add(da);
+                log("Will die after "+da.getNumMsgs()+" msgs from "+da.getFromProc());
+            }
         }
     }
 
@@ -373,7 +420,7 @@ public abstract class Node implements MessageReceiver {
         }
 
         private Thread createTimer(int peerID) {
-            final Thread thread = new Thread(new TimeoutTimer(peerID, Common.TIMEOUT_MILLISECONDS));
+            final Thread thread = new Thread(new TimeoutTimer(peerID, Common.TIMEOUT_MILLISECONDS()));
             thread.start();
             return thread;
         }

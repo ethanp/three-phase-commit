@@ -108,9 +108,13 @@ public class AsyncTxnMgr extends TransactionManager {
                 ManagerNodeRef nodeToKill = remoteNodeWithID(killSig.getNodeID());
                 restartNode(nodeToKill);
                 break;
+            case LIST:
+                broadcast(command.getVoteRequest());
+                break;
             default:
                 addPeerSet(command);
                 processRequest(command.getVoteRequest());
+                break;
         }
 
     }

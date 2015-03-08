@@ -5,6 +5,7 @@ import messages.DelayMessage;
 import messages.InRecoveryResponse;
 import messages.Message;
 import messages.Message.Command;
+import messages.PeerTimeout;
 import messages.UncertainResponse;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
@@ -211,17 +212,20 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 
     public void sendDecisionRequestToCurrentPeer() {
         PeerReference current = sortedPeers.get(currentPeerIndex);
-        System.out.println("Node "+ownerNode.getMyNodeID()+": sending DEC_REC to "+current.getNodeID());
-        ownerNode.resetTimersFor(current.getNodeID());
+        final int currentNodeID = current.getNodeID();
+        System.out.println("Node "+ownerNode.getMyNodeID()+": sending DEC_REC to "+currentNodeID);
         try {
 //            System.out.println("Node "+ownerNode.getMyNodeID()+" adding timer for "+current.getNodeID());
             Connection currentPeerConnection = ownerNode.getOrConnectToPeer(current);
-            ownerNode.log("obtained conn to "+current.getNodeID());
+            ownerNode.log("obtained conn to "+currentNodeID);
             ownerNode.send(currentPeerConnection, new DecisionRequest(uncommitted.getTransactionID()));
+            ownerNode.resetTimersFor(currentNodeID);
         }
         catch (IOException e) {
             System.err.println("Node "+ownerNode.getMyNodeID()+": " +
-                               "could not send DEC_REC to "+current.getNodeID());
+                               "could not send DEC_REC to "+currentNodeID);
+            ownerNode.sendTxnMgrMsg(new PeerTimeout(currentNodeID));
+            advanceToNextProcessOrRewind();
         }
 	}
 

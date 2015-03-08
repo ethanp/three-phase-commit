@@ -43,7 +43,7 @@ public class SongTuple implements Comparable<SongTuple>, Serializable {
     }
 
     public String toLogString() {
-        return name+"\n"+url;
+        return name+" "+url;
     }
 
     public void writeAsTokens(TokenWriter writer) {

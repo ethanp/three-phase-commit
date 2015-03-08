@@ -3,7 +3,6 @@ package node;
 import messages.AbortRequest;
 import messages.AckRequest;
 import messages.CommitRequest;
-import messages.DelayMessage;
 import messages.Message;
 import messages.NoResponse;
 import messages.PeerTimeout;
@@ -53,9 +52,6 @@ public class ParticipantStateMachine extends StateMachine {
 
     @Override public boolean receiveMessage(Connection overConnection, Message msg) {
         currentConnection = overConnection;
-        try { Thread.sleep(Common.MESSAGE_DELAY); }
-        catch (InterruptedException ignored) {}
-
         synchronized (this) {
 
             System.out.println("Participant "+ownerNode.getMyNodeID()+" received a "+msg.getCommand()+" from "+currentConnection.getReceiverID());
@@ -150,17 +146,6 @@ public class ParticipantStateMachine extends StateMachine {
                     }
                     break;
 
-                /* SET FAIL-CASE OR DELAY */
-                case PARTIAL_BROADCAST:
-                case DEATH_AFTER:
-                    ownerNode.addFailure(msg);
-                    break;
-
-                /* SET INTERACTIVE DELAY */
-                case DELAY:
-                    Common.MESSAGE_DELAY = ((DelayMessage) msg).getDelaySec()*1000;
-                    break;
-
                 default:
                     throw new RuntimeException("Not a valid message: "+msg.getCommand());
             }
@@ -214,7 +199,7 @@ public class ParticipantStateMachine extends StateMachine {
     private void receiveVoteRequest(VoteRequest voteRequest, boolean voteValue) {
     	setCoordinatorID(currentConnection.getReceiverID());
         coordinatorConnection = currentConnection;
-
+        ownerNode.setUpSet(voteRequest.getPeerSet());
     	ownerNode.logMessage(voteRequest);
         if (voteValue) {
             respondYESToVoteRequest(voteRequest);
@@ -328,6 +313,7 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     private void removeFromUpset(int id) {
+        if (ownerNode.getUpSet() == null) return;
         ownerNode.setUpSet(ownerNode.getUpSet()
                           .stream()
                           .filter(c -> c.getNodeID() != id)

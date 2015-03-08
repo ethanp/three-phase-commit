@@ -126,9 +126,12 @@ public class FailureRecoveryTest extends TestCommon {
         secondNode.recoverFromDtLog();
 
         ParticipantRecoveryStateMachine secondSM = (ParticipantRecoveryStateMachine)secondNode.getStateMachine();
+        secondSM.sendDecisionRequestToCurrentPeer();
 
-        // second node sends decision_req to first node, and first node replies with in_recovery
+        // second node sends decision_req to first node
 		assertTrue(firstSM.receiveMessage(oneToTwo));
+
+        // first node replies with in_recovery
 		assertTrue(secondSM.receiveMessage(twoToOne));
 
         // verify second node's recovery set
@@ -165,6 +168,8 @@ public class FailureRecoveryTest extends TestCommon {
 
         thirdNode.setDtLog(stubNode.getDtLog());
         thirdNode.recoverFromDtLog();
+
+        ((ParticipantRecoveryStateMachine)thirdNode.getStateMachine()).sendDecisionRequestToCurrentPeer();
 
         // third node sends decision_req to first node, and first node replies with in_recovery
 		assertTrue(firstNode.getStateMachine().receiveMessage(oneToThree));
@@ -290,6 +295,7 @@ public class FailureRecoveryTest extends TestCommon {
         // node 1 reboots
         firstNode.setDtLog(stubNode.getDtLog());
         firstNode.recoverFromDtLog();
+        ((ParticipantRecoveryStateMachine)firstNode.getStateMachine()).sendDecisionRequestToCurrentPeer();
 
         // receive dec-req
         assertTrue(sm2.receiveMessage(rcv2Frm1));

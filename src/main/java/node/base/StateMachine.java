@@ -5,13 +5,14 @@ import node.PeerReference;
 import system.network.Connection;
 
 import java.io.EOFException;
+import java.util.ArrayList;
 import java.util.Collection;
 
 /**
  * Ethan Petuchowski 2/26/15
  */
 public abstract class StateMachine {
-    private Collection<PeerReference> peerSet = null;
+    private Collection<PeerReference> peerSet = new ArrayList<>();
     protected Node ownerNode;
 
     protected StateMachine(Node node) {

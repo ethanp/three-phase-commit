@@ -68,7 +68,7 @@ public class AsynchronousSystemTest extends TestCommon {
         VoteRequest addRequest = new AddRequest(A_SONG_TUPLE, TXID, peerReferences);
         assertEquals(COMMIT, system.processRequestToCompletion(addRequest).getCommand());
 
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS);
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS());
         system.killAllNodes();
 
         String coordLog = coordLogString();
@@ -87,7 +87,7 @@ public class AsynchronousSystemTest extends TestCommon {
         VoteRequest up = new UpdateRequest(A_SONG_NAME, SAME_SONG_NEW_URL, TXID+1, peerReferences);
         assertEquals(COMMIT, system.processRequestToCompletion(up).getCommand());
 
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS);
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS());
         system.killAllNodes();
 
         String coordLog = coordLogString();
@@ -111,7 +111,7 @@ public class AsynchronousSystemTest extends TestCommon {
         VoteRequest deleteRequest = new DeleteRequest(A_SONG_NAME, TXID+1, peerReferences);
         assertEquals(COMMIT, system.processRequestToCompletion(deleteRequest).getCommand());
 
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS);
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS());
         system.killAllNodes();
 
         String coordLog = coordLogString();
@@ -171,7 +171,7 @@ public class AsynchronousSystemTest extends TestCommon {
         ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
         assertEquals(ABORT, system.processCommandToCompletion(command).getCommand());
 
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS);
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS());
         system.killAllNodes();
     }
 
@@ -198,13 +198,13 @@ public class AsynchronousSystemTest extends TestCommon {
         p.flush();
 
         system.getTxnMgr().restartNodeWithID(2);
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS);
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS());
 
         String cmdStr = "add a_song a_url -deathAfter 1 1 2";
         ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
         assertEquals(ABORT, system.processCommandToCompletion(command).getCommand());
 
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS()*2);
         system.killAllNodes();
     }
 
@@ -215,7 +215,7 @@ public class AsynchronousSystemTest extends TestCommon {
         ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
         assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
 
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS()*2);
         assertLogContains(2, COMMIT, TXID);
         system.killAllNodes();
     }
@@ -264,68 +264,27 @@ public class AsynchronousSystemTest extends TestCommon {
 
             We need to adjust P->C so that C gets whether P was precommitted
          */
-
-        String cmdStr = "add a_song a_url -partialPrecommit 2 1";
-        ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
-        assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
-
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);
-        for (int i = 1; i <= 5; i++) {
-            assertLogContains(i, COMMIT, TXID);
-        }
-        system.killAllNodes();
+        runAndCheckCommandCommitted("add a_song a_url -partialPrecommit 2 1", 6);
     }
 
     @Test
     public void testCoordinatorFailsPrecommitToAll() throws Exception {
-        String cmdStr = "add a_song a_url -partialPrecommit 4 1";
-        ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
-        assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
-
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);
-        for (int i = 1; i <= 5; i++) {
-            assertLogContains(i, COMMIT, TXID);
-        }
-        system.killAllNodes();
+        runAndCheckCommandCommitted("add a_song a_url -partialPrecommit 4 1", 2);
     }
 
     @Test
     public void testCoordinatorFailsCommitToTwo() throws Exception {
-        String cmdStr = "add a_song a_url -partialCommit 2 1";
-        ConsoleCommand command = new ConsoleCommand(cmdStr, TXID);
-        assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
-
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);
-        for (int i = 1; i <= 5; i++) {
-            assertLogContains(i, COMMIT, TXID);
-        }
-        system.killAllNodes();
+        runAndCheckCommandCommitted("add a_song a_url -partialCommit 2 1", 4);
     }
 
     @Test
     public void testCoordinatorFailsCommitToAll() throws Exception {
-        String cmdStr = "add a_song a_url -partialCommit 4 1";
-        ConsoleCommand command = new ConsoleCommand(cmdStr, system.getTxnMgr().getNextTransactionID());
-        assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
-
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS*2);
-        for (int i = 1; i <= 5; i++) {
-            assertLogContains(i, COMMIT, TXID);
-        }
-        system.killAllNodes();
+        runAndCheckCommandCommitted("add a_song a_url -partialCommit 4 1", 2);
     }
 
     @Test
     public void testFutureCoordinatorFailure() throws Exception {
-        String cmdStr = "add a_song a_url -deathAfter 1 3 2 -deathAfter 1 4 2 -deathAfter 1 5 2 -partialPrecommit 3 1";
-        ConsoleCommand command = new ConsoleCommand(cmdStr, system.getTxnMgr().getNextTransactionID());
-        assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
-
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS*4);
-        for (int i = 1; i <= 5; i++) {
-            assertLogContains(i, COMMIT, TXID);
-        }
-        system.killAllNodes();
+        runAndCheckCommandCommitted("add a_song a_url -deathAfter 1 3 2 -deathAfter 1 4 2 -deathAfter 1 5 2 -partialPrecommit 3 1", 4);
     }
 
     private void assertLogContains(int nodeID, Message.Command command, int txid) throws IOException {
@@ -333,7 +292,42 @@ public class AsynchronousSystemTest extends TestCommon {
         Optional<Message> opM = msgs.stream()
                                     .filter(m -> m.getCommand() == command && m.getTransactionID() == txid)
                                     .findFirst();
-        assertTrue(opM.isPresent());
+        assertTrue("Node "+nodeID+" doesn't have "+command.toString(), opM.isPresent());
     }
 
+    private void runAndCheckCommandCommitted(String cmdStr, int timeoutMultiplier) throws Exception {
+        runAndCheckCommand(cmdStr, timeoutMultiplier, COMMIT);
+    }
+
+    private void runAndCheckCommand(String cmdStr, int timeoutMultiplier, Message.Command result) throws InterruptedException, IOException {
+        ConsoleCommand command = new ConsoleCommand(cmdStr, system.getTxnMgr().getNextTransactionID());
+        assertEquals(result, system.processCommandToCompletion(command).getCommand());
+
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS()*timeoutMultiplier);
+        for (int i = 1; i <= 5; i++) {
+            assertLogContains(i, result, TXID);
+        }
+        system.killAllNodes();
+    }
+
+    @Test
+    public void testCascadingCoordinatorFailure_5staysAlive() throws Exception {
+        runAndCheckCommand("add a b "+
+                           "-partialPrecommit 2 1 "+
+                           "-deathAfterElected 2 "+
+                           "-deathAfterElected 3 "+
+                           "-deathAfterElected 4",
+                           4, ABORT);
+    }
+
+    @Test
+    public void testCascadingCoordinatorFailure_allDie() throws Exception {
+        runAndCheckCommand("add a b "+
+                           "-partialPrecommit 2 1 "+
+                           "-deathAfterElected 2 "+
+                           "-deathAfterElected 3 "+
+                           "-deathAfterElected 4 "+
+                           "-deathAfterElected 5",
+                           8, ABORT);
+    }
 }

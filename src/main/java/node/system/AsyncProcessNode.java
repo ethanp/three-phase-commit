@@ -2,6 +2,7 @@ package node.system;
 
 import messages.Message;
 import messages.NodeMessage;
+import node.ParticipantRecoveryStateMachine;
 import node.PeerReference;
 import node.base.Node;
 import system.network.Connection;
@@ -55,6 +56,9 @@ public class AsyncProcessNode extends Node {
             System.exit(Common.EXIT_FAILURE);
         }
 
+        if (stateMachine instanceof ParticipantRecoveryStateMachine) {
+            ((ParticipantRecoveryStateMachine)stateMachine).sendDecisionRequestToCurrentPeer();
+        }
     }
 
     int getListenPort() {

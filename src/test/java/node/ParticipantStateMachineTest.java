@@ -364,7 +364,7 @@ public class ParticipantStateMachineTest extends TestCommon {
         participantUnderTest.resetTimersFor(coordID);
 
         /* wait until it runs out */
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS+200);
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS()+200);
 
         final String logAsString = participantUnderTest.getDtLog().getLogAsString();
         assertThat(logAsString, containsString("TIMEOUT"));

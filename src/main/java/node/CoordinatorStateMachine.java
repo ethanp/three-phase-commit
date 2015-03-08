@@ -59,7 +59,18 @@ public class CoordinatorStateMachine extends StateMachine {
             machine.uncertainStates = 1;
         }
 		Collection<PeerReference> notMe = ownerNode.getUpSet().stream().filter(pr -> pr.getNodeID() != ownerNode.getMyNodeID()).collect(Collectors.toList());
-		machine.setupTransactionConnectionsAndSendMessage(new StateRequest(machine.ongoingTransactionID), notMe);
+        if (notMe.isEmpty()) {
+            machine.txnConnections = new ArrayList<>();
+            if (precommitted) {
+                machine.commitCurrentAction();
+            }
+            else {
+                machine.abortCurrentTransaction();
+            }
+        }
+        else {
+            machine.setupTransactionConnectionsAndSendMessage(new StateRequest(machine.ongoingTransactionID), notMe);
+        }
 		return machine;
 	}
 
@@ -85,9 +96,6 @@ public class CoordinatorStateMachine extends StateMachine {
 	}
 
     @Override public boolean receiveMessage(Connection overConnection, Message message) {
-        try { Thread.sleep(Common.MESSAGE_DELAY); }
-        catch (InterruptedException ignored) {}
-
         synchronized (this) {
             System.out.println("Coordinator "+ownerNode.getMyNodeID()+" "+
                                "received a "+message.getCommand()+" from "+overConnection.getReceiverID());
@@ -133,12 +141,15 @@ public class CoordinatorStateMachine extends StateMachine {
                 case TIMEOUT:
                     int peerID = ((PeerTimeout) message).getPeerId();
                     ownerNode.cancelTimersFor(peerID);
-                    PeerReference ref = getPeerSet().stream()
-                                                    .filter(pr -> pr.nodeID == peerID)
-                                                    .findFirst()
-                                                    .get();
-                    ownerNode.logMessage(message);
-                    onTimeout(ref);
+                    if (ownerNode.getUpSet() == null) {
+                    } else {
+                        PeerReference ref = getPeerSet().stream()
+                                                        .filter(pr -> pr.nodeID == peerID)
+                                                        .findFirst()
+                                                        .get();
+                        ownerNode.logMessage(message);
+                        onTimeout(ref);
+                    }
                     break;
 
                 case COMMIT:
@@ -207,6 +218,7 @@ public class CoordinatorStateMachine extends StateMachine {
                     Common.MESSAGE_DELAY = ((DelayMessage) message).getDelaySec()*1000;
                     break;
 
+                case IN_RECOVERY:
                 case DUB_COORDINATOR:
                     /* ignore */
                     break;
