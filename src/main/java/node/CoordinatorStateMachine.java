@@ -104,6 +104,12 @@ public class CoordinatorStateMachine extends StateMachine {
                 case ADD:
                 case UPDATE:
                 case DELETE:
+                    if (overConnection.getReceiverID() > 0
+                     && overConnection.getReceiverID() < ownerNode.getMyNodeID())
+                    {
+                        ownerNode.becomeParticipant();
+                        ownerNode.getStateMachine().receiveMessage(overConnection, message);
+                    }
                     if (state == CoordinatorState.WaitingForCommand) {
                         receivePlaylistCommand((VoteRequest) message);
                         break;

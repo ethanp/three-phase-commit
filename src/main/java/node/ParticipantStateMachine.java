@@ -147,7 +147,7 @@ public class ParticipantStateMachine extends StateMachine {
                     break;
 
                 default:
-                    throw new RuntimeException("Not a valid message: "+msg.getCommand());
+                    ownerNode.log("Not a valid message: "+msg.getCommand());
             }
         }
 
@@ -299,10 +299,13 @@ public class ParticipantStateMachine extends StateMachine {
 
     private void onTimeout(PeerTimeout timeout) {
         if (timeout.getPeerId() == coordinatorId) {
-	    	ownerNode.logMessage(timeout);
-	        removeFromUpset(timeout.getPeerId());
-            ownerNode.electNewLeader(action, precommitted);
             ownerNode.sendTxnMgrMsg(timeout);
+
+            if (action != null) {
+                ownerNode.logMessage(timeout);
+                removeFromUpset(timeout.getPeerId());
+                ownerNode.electNewLeader(action, precommitted);
+            }
     	}
     }
 

@@ -85,14 +85,9 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
         switch (message.getCommand()) {
 
             case COMMIT:
-                if (state == ParticipantRecoveryState.NoInformation ||
-                    state == ParticipantRecoveryState.SomeProcessesInRecovery) {
-                    ownerNode.logMessage(message);
-                    ownerNode.applyActionToVolatileStorage(uncommitted);
-                    ownerNode.becomeParticipant();
-                }
-                else /* some processes uncertain! */
-                    throw new RuntimeException("Received commit response in a state where we weren't expecting one.");
+                ownerNode.logMessage(message);
+                ownerNode.applyActionToVolatileStorage(uncommitted);
+                ownerNode.becomeParticipant();
                 break;
 
             case ABORT:

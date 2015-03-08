@@ -14,13 +14,10 @@ import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.system.SyncNode;
-
 import org.junit.Before;
 import org.junit.Test;
-
 import system.network.QueueConnection;
 import system.network.QueueSocket;
-import util.Common;
 import util.SongTuple;
 import util.TestCommon;
 
@@ -341,37 +338,6 @@ public class ParticipantStateMachineTest extends TestCommon {
         assertNull(participantSM.getPeerSet());
         assertNull(participantUnderTest.getUpSet());
         assertThat(participantUnderTest.getDtLog().getLogAsString(), containsString("ABORT"));
-    }
-
-    /**
-     * This likely is incorrect because not enough of the async setup has been fleshed-out
-     * to properly know how to emulate the triggering of the heartbeat and what really
-     * should happen. This is a guess though.
-     */
-    @Test
-    public void testReceiveCoordinatorTimeout() throws Exception {
-        final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
-        participantSM.setAction(action);
-        participantSM.setPeerSet(A_PEER_REFS);
-        participantUnderTest.setUpSet(participantSM.getPeerSet()
-                                            .stream()
-                                            .map(PeerReference::clone)
-                                            .collect(Collectors.toList()));
-        final int coordID = A_PEER_REFS.iterator().next().getNodeID();
-        participantSM.setCoordinatorID(coordID);
-
-        /* start the timer */
-        participantUnderTest.resetTimersFor(coordID);
-
-        /* wait until it runs out */
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS()+200);
-
-        final String logAsString = participantUnderTest.getDtLog().getLogAsString();
-        assertThat(logAsString, containsString("TIMEOUT"));
-        assertThat(logAsString, containsString(String.valueOf(coordID)));
-        // normally the participant, having become the coordinator, would broadcast a state_req to the other peers,
-        // but we haven't given it any other connections to those peers.
-        assertTrue(participantUnderTest.getStateMachine() instanceof CoordinatorStateMachine);
     }
 
     @Test
