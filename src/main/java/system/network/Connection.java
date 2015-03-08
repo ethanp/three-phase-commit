@@ -23,4 +23,6 @@ public abstract class Connection {
     public void setReceiverID(int receiverID) {
         this.receiverID = receiverID;
     }
+
+    public abstract boolean isReady();
 }

@@ -17,7 +17,7 @@ public class ConnectionListener implements Runnable {
 
     @Override public void run() {
         while (connection.isReady()) {
-            receiver.receiveMessageFrom(connection, msgsRcvd++);
+            receiver.receiveMessageFrom(connection, ++msgsRcvd);
         }
     }
 }

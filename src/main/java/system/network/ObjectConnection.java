@@ -26,7 +26,7 @@ public class ObjectConnection extends Connection {
             in = new ObjectInputStream(socket.getInputStream());
         }
         catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Failed to create object streams to "+getReceiverID());
         }
     }
 
@@ -64,16 +64,20 @@ public class ObjectConnection extends Connection {
                 out.writeObject(o);
                 out.flush();
             }
-            catch (IOException e) {
-                e.printStackTrace();
+            catch (IOException ignored) {
+                System.err.println("Failed to send message to "+getReceiverID());
             }
         }
         else {
-            System.err.println("Socket not write-to-able");
+            System.err.println("Socket to "+getReceiverID()+" is not write-to-able");
         }
     }
 
     public boolean isReady() {
-        return socket.isBound() && socket.isConnected() && !socket.isClosed();
+        return socket.isBound()
+               && socket.isConnected()
+               && !socket.isClosed()
+               && in != null
+               && out != null;
     }
 }

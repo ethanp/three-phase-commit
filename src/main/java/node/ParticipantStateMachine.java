@@ -35,6 +35,7 @@ public class ParticipantStateMachine extends StateMachine {
     private VoteRequest action;  // the update being performed
     private boolean precommitted = false;
     private Connection currentConnection = null;
+    private Connection coordinatorConnection = null;
     private int coordinatorId;
 
     public static ParticipantStateMachine startInTerminationProtocol(Node ownerNode, VoteRequest action, boolean precommit) {
@@ -58,18 +59,20 @@ public class ParticipantStateMachine extends StateMachine {
 
             System.out.println("Participant "+ownerNode.getMyNodeID()+" received a "+msg.getCommand()+" from "+currentConnection.getReceiverID());
 
-            /* if it's from the Coordinator, reset their timeout timer */
-            switch (msg.getCommand()) {
-                case ADD:
-                case UPDATE:
-                case DELETE:
-                case PRE_COMMIT:
-                    ownerNode.resetTimersFor(currentConnection.getReceiverID());
-                    break;
-                case ABORT:
-                case COMMIT:
-                    ownerNode.cancelTimersFor(currentConnection.getReceiverID());
-                    break;
+            if (currentConnection.getReceiverID() == coordinatorId) {
+                switch (msg.getCommand()) {
+                    case ADD:
+                    case UPDATE:
+                    case DELETE:
+                    case PRE_COMMIT:
+                    case STATE_REQUEST:
+                        ownerNode.resetTimersFor(currentConnection.getReceiverID());
+                        break;
+                    case ABORT:
+                    case COMMIT:
+                        ownerNode.cancelTimersFor(currentConnection.getReceiverID());
+                        break;
+                }
             }
 
             switch (msg.getCommand()) {
@@ -134,7 +137,6 @@ public class ParticipantStateMachine extends StateMachine {
                 		m = precommitted ? new PrecommitRequest(ongoingTransactionID) : new UncertainResponse(action.getTransactionID());
                 	}
                 	overConnection.sendMessage(m);
-                	ownerNode.resetTimersFor(overConnection.getReceiverID());
                 	break;
 
                 /* SET FAIL-CASE OR DELAY */
@@ -189,6 +191,8 @@ public class ParticipantStateMachine extends StateMachine {
 
     private void receiveVoteRequest(VoteRequest voteRequest, boolean voteValue) {
     	setCoordinatorID(currentConnection.getReceiverID());
+        coordinatorConnection = currentConnection;
+
     	ownerNode.logMessage(voteRequest);
         if (voteValue) {
             respondYESToVoteRequest(voteRequest);
@@ -263,7 +267,7 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     public void setCoordinatorID(int coordinatorID) {
-    	this.coordinatorId = coordinatorID;
+        this.coordinatorId = coordinatorID;
     }
 
     public VoteRequest getAction() {
@@ -275,16 +279,13 @@ public class ParticipantStateMachine extends StateMachine {
     }
 
     private void onTimeout(PeerTimeout timeout) {
-    	if (timeout.getPeerId() == coordinatorId) {
+        System.out.println("Timed-out on "+timeout.getPeerId());
+        if (timeout.getPeerId() == coordinatorId) {
 	    	ownerNode.logMessage(timeout);
 	        removeFromUpset(timeout.getPeerId());
             ownerNode.electNewLeader(action, precommitted);
             ownerNode.sendTxnMgrMsg(timeout);
     	}
-        else {
-            throw new RuntimeException("timeout on ownerNode ["+timeout.getPeerId()+"] "+
-                                       "not known to be coordinator");
-        }
     }
 
     private PeerReference getNodeWithLowestIDInUpset() {
@@ -298,5 +299,9 @@ public class ParticipantStateMachine extends StateMachine {
                           .stream()
                           .filter(c -> c.getNodeID() != id)
                           .collect(Collectors.toList()));
+    }
+
+    public void setCoordinatorConnection(Connection coordinatorConnection) {
+        this.coordinatorConnection = coordinatorConnection;
     }
 }

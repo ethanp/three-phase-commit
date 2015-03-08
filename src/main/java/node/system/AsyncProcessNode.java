@@ -42,7 +42,6 @@ public class AsyncProcessNode extends Node {
         try {
             final Socket socket = new Socket(Common.LOCALHOST, systemListenPort);
             txnMgrConn = new ObjectConnection(socket, TXN_MGR_ID);
-            L.OG("connected to System");
 
             /* tell the System my logical ID and listen port */
             // (doesn't increment sent-msgs count)
@@ -67,7 +66,6 @@ public class AsyncProcessNode extends Node {
             System.err.println("Connection is null");
         }
         else {
-            L.OG("connected to "+connection.getReceiverID());
             new Thread(new ConnectionListener(this, (ObjectConnection) connection)).start();
         }
     }
@@ -84,7 +82,6 @@ public class AsyncProcessNode extends Node {
      */
     @Override public Connection connectTo(PeerReference peerReference) {
         try {
-            L.OG("Connecting to "+peerReference.getNodeID());
             final ObjectConnection connection = new ObjectConnection(
                     new Socket(LOCALHOST, peerReference.getListeningPort()),
                     peerReference.getNodeID());

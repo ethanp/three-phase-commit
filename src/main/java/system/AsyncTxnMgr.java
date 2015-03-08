@@ -196,11 +196,15 @@ public class AsyncTxnMgr extends TransactionManager {
                 break;
 
             case TIMEOUT:
-                reviveNode(((PeerTimeout)response).getPeerId());
+                final int peerId = ((PeerTimeout) response).getPeerId();
+                if (peerId > getCoordinator().getNodeID()) {
+                    reviveNode(peerId);
+                }
                 break;
 
             default:
                 if (getTransactionResult() == null) {
+                    try { Thread.sleep(500); } catch (InterruptedException e) {}
                     sendCoordinator(new DecisionRequest(getTransactionID()));
                 }
                 break;

@@ -26,6 +26,10 @@ public class QueueConnection extends Connection {
         outQueue.add(o);
     }
 
+    @Override public boolean isReady() {
+        return true;
+    }
+
     public Queue<Message> getInQueue() {
         return inQueue;
     }

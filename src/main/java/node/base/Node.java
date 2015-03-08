@@ -51,7 +51,7 @@ public abstract class Node implements MessageReceiver {
     private Collection<PeerReference> upSet = null;
 
     protected PartialBroadcast partialBroadcast = null;
-    protected DeathAfter deathAfter = null;
+    protected Collection<DeathAfter> deathAfters = new ArrayList<>();
 
     protected int msgsSent = 0;
 
@@ -176,12 +176,11 @@ public abstract class Node implements MessageReceiver {
 
     @Override public boolean receiveMessageFrom(Connection connection, int msgsRcvd) {
         final int otherEnd = connection.getReceiverID();
-        if (deathAfter != null
-            && deathAfter.getFromProc() == otherEnd
-            && msgsRcvd >= deathAfter.getNumMsgs())
-        {
-            System.out.println(getMyNodeID()+" received too many messages from "+otherEnd);
-            selfDestruct();
+        for (DeathAfter deathAfter : deathAfters) {
+            if (deathAfter.getFromProc() == otherEnd && msgsRcvd >= deathAfter.getNumMsgs()) {
+                System.out.println(getMyNodeID()+" received too many messages from "+otherEnd);
+                selfDestruct();
+            }
         }
 
         Message message = null;
@@ -208,7 +207,8 @@ public abstract class Node implements MessageReceiver {
     }
 
     public void becomeParticipant() {
-    	stateMachine = new ParticipantStateMachine(this);
+        System.out.println("Node "+getMyNodeID()+": becoming participant");
+        stateMachine = new ParticipantStateMachine(this);
     }
 
     public void becomeParticipantInRecovery(VoteRequest ongoingAction, boolean precommit) {
@@ -273,6 +273,10 @@ public abstract class Node implements MessageReceiver {
         timeoutMonitor.cancelTimersFor(peerID);
     }
 
+    public void addTimerFor(int peerID) {
+        timeoutMonitor.startTimer(peerID);
+    }
+
     public void electNewLeader(VoteRequest ongoingAction, boolean precommitted) {
     	PeerReference newCoordinator = upSet.stream().min((a, b) -> a.compareTo(b)).get();
     	if (newCoordinator.getNodeID() == myNodeID) {
@@ -282,7 +286,10 @@ public abstract class Node implements MessageReceiver {
     		getOrConnectToPeer(newCoordinator).sendMessage(new ElectedMessage(ongoingAction.getTransactionID()));
     		resetTimersFor(newCoordinator.getNodeID());
     		stateMachine = ParticipantStateMachine.startInTerminationProtocol(this, ongoingAction, precommitted);
-            ((ParticipantStateMachine)stateMachine).setCoordinatorID(newCoordinator.getNodeID());
+            final ParticipantStateMachine participantStateMachine = (ParticipantStateMachine) stateMachine;
+            participantStateMachine.setCoordinatorID(newCoordinator.getNodeID());
+            participantStateMachine.setCoordinatorConnection(getOrConnectToPeer(newCoordinator));
+
     	}
     }
 
@@ -298,8 +305,10 @@ public abstract class Node implements MessageReceiver {
             partialBroadcast = (PartialBroadcast) msg;
         }
         else if (msg instanceof DeathAfter) {
-            deathAfter = (DeathAfter) msg;
-            System.out.println(getMyNodeID()+" will die after "+deathAfter.getNumMsgs()+" msgs from "+deathAfter.getFromProc());
+            deathAfters.add((DeathAfter) msg);
+            System.out.println(getMyNodeID()+" will die after "+
+                               ((DeathAfter)msg).getNumMsgs()+" msgs from "+
+                               ((DeathAfter)msg).getFromProc());
         }
     }
 

@@ -5,6 +5,7 @@ import messages.DelayMessage;
 import messages.InRecoveryResponse;
 import messages.Message;
 import messages.Message.Command;
+import messages.PeerTimeout;
 import messages.UncertainResponse;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
@@ -61,144 +62,152 @@ public class ParticipantRecoveryStateMachine extends StateMachine {
 	}
 
 	@Override
-	public boolean receiveMessage(Connection overConnection, Message message) {
-        synchronized (this) {
-            int receiverID = overConnection.getReceiverID();
-            if (!message.getCommand().equals(Command.TIMEOUT)) {
-                recoveredProcesses.add(receiverID);
-            }
-            else {
-                recoveredProcesses.remove(receiverID);
-            }
+    public synchronized boolean receiveMessage(Connection overConnection, Message message) {
+        int receiverID = overConnection.getReceiverID();
 
-            System.out.println("ParticipantInRec "+ownerNode.getMyNodeID()+" received a "+message.getCommand()+" from "+overConnection
-                    .getReceiverID());
-            switch (message.getCommand()) {
+        if (!message.getCommand().equals(Command.TIMEOUT) && receiverID > 0) {
+            recoveredProcesses.add(receiverID);
+            ownerNode.cancelTimersFor(overConnection.getReceiverID());
+        }
+        else {
+            recoveredProcesses.remove(receiverID);
+        }
 
-                case COMMIT:
-                    if (state == ParticipantRecoveryState.NoInformation) {
-                        ownerNode.logMessage(message);
-                        ownerNode.applyActionToVolatileStorage(uncommitted);
-                        ownerNode.becomeParticipant();
+        System.out.println("ParticipantInRec "+ownerNode.getMyNodeID()+" received a "+message.getCommand()+" from "+overConnection
+                .getReceiverID());
+        switch (message.getCommand()) {
+
+            case COMMIT:
+                if (state == ParticipantRecoveryState.NoInformation ||
+                    state == ParticipantRecoveryState.SomeProcessesInRecovery) {
+                    ownerNode.logMessage(message);
+                    ownerNode.applyActionToVolatileStorage(uncommitted);
+                    ownerNode.becomeParticipant();
+                }
+                else /* some processes uncertain! */
+                    throw new RuntimeException("Received commit response in a state where we weren't expecting one.");
+                break;
+
+            case ABORT:
+                ownerNode.logMessage(message);
+                ownerNode.becomeParticipant();
+                break;
+
+            case PRE_COMMIT:
+                advanceToNextProcessOrRewind();
+                break;
+
+            case UNCERTAIN:
+                state = ParticipantRecoveryState.SomeProcessesUncertain;
+                advanceToNextProcessOrRewind();
+                break;
+
+            case TIMEOUT:
+                System.out.println("ParticipantInRec "+ownerNode.getMyNodeID()+" timed out on "+((PeerTimeout)message).getPeerId());
+                advanceToNextProcessOrRewind();
+                break;
+
+            case IN_RECOVERY:
+                if (state == ParticipantRecoveryState.NoInformation ||
+                    state == ParticipantRecoveryState.SomeProcessesInRecovery) {
+
+                    state = ParticipantRecoveryState.SomeProcessesInRecovery;
+                    InRecoveryResponse inRecovery = (InRecoveryResponse) message;
+                    // add to recovered processes
+                    this.recoveredProcesses.add(sortedPeers.get(currentPeerIndex).getNodeID());
+                    // compute new UP set intersection
+                    upSetIntersection.retainAll(inRecovery.getLastUpSet());
+
+                    if (++currentPeerIndex < sortedPeers.size()) {
+                        sendDecisionRequestToCurrentPeer();
                     }
-                    else
-                        throw new RuntimeException("Received commit response in a state where we weren't expecting one.");
-                    break;
-                case ABORT:
-                    if (state == ParticipantRecoveryState.NoInformation ||
-                        state == ParticipantRecoveryState.SomeProcessesUncertain ||
-                        state == ParticipantRecoveryState.SomeProcessesInRecovery) {
-                        ownerNode.logMessage(message);
-                        ownerNode.becomeParticipant();
-                    }
-                    break;
-                case UNCERTAIN:
-                case PRE_COMMIT:
-                    if (state == ParticipantRecoveryState.NoInformation ||
-                        state == ParticipantRecoveryState.SomeProcessesUncertain ||
-                        state == ParticipantRecoveryState.SomeProcessesInRecovery) {
-
-                        state = ParticipantRecoveryState.SomeProcessesUncertain;
-                        advanceToNextProcessOrRewind();
-
-                    }
-                    break;
-                case TIMEOUT:
-                    advanceToNextProcessOrRewind();
-                    break;
-                case IN_RECOVERY:
-                    if (state == ParticipantRecoveryState.NoInformation ||
-                        state == ParticipantRecoveryState.SomeProcessesInRecovery) {
-
-                        state = ParticipantRecoveryState.SomeProcessesInRecovery;
-                        InRecoveryResponse inRecovery = (InRecoveryResponse) message;
-                        // add to recovered processes
-                        this.recoveredProcesses.add(sortedPeers.get(currentPeerIndex).getNodeID());
-                        // compute new UP set intersection
-                        upSetIntersection.retainAll(inRecovery.getLastUpSet());
-
-                        if (++currentPeerIndex < sortedPeers.size()) {
-                            sendDecisionRequestToCurrentPeer();
+                    else {
+                        // all peers are in recovery, so see if we can elect a leader.
+                        boolean ready = true;
+                        int max = upSetIntersection.stream().max(Integer::max).get();
+                        for (int i = 1; i <= max; ++i) {
+                            if (!recoveredProcesses.contains(i)) {
+                                ready = false;
+                                break;
+                            }
+                        }
+                        if (ready) {
+                            updateNodeUpSet();
+                            ownerNode.electNewLeader(uncommitted, false);
                         }
                         else {
-                            // all peers are in recovery, so see if we can elect a leader.
-                            boolean ready = true;
-                            int max = upSetIntersection.stream().max(Integer::max).get();
-                            for (int i = 1; i <= max; ++i) {
-                                if (!recoveredProcesses.contains(i)) {
-                                    ready = false;
-                                    break;
-                                }
-                            }
-                            if (ready) {
-                                updateNodeUpSet();
-                                ownerNode.electNewLeader(uncommitted, false);
-                            }
-                            else {
-                                // the last process to fail hasn't recovered yet, so rewind
-                                advanceToNextProcessOrRewind();
-                            }
+                            // the last process to fail hasn't recovered yet, so rewind
+                            advanceToNextProcessOrRewind();
                         }
                     }
-                    else if (state == ParticipantRecoveryState.SomeProcessesUncertain) {
-                        // recovering process doesn't matter; keep walking the list
-                        advanceToNextProcessOrRewind();
-                    }
-                    break;
-                case DECISION_REQUEST:
-                    ownerNode.send(overConnection, new InRecoveryResponse(uncommitted.getTransactionID(), originalUpSet));
-                    break;
-                case STATE_REQUEST:
-                    ownerNode.send(overConnection, new UncertainResponse(uncommitted.getTransactionID()));
-                    ownerNode.becomeParticipantInRecovery(uncommitted, false);
-                    ownerNode.resetTimersFor(overConnection.getReceiverID());
-                    break;
-                case UR_ELECTED:
-                    updateNodeUpSet();
-                    ownerNode.becomeCoordinatorInRecovery(uncommitted, false);
-                    break;
+                }
+                else if (state == ParticipantRecoveryState.SomeProcessesUncertain) {
+                    // recovering process doesn't matter; keep walking the list
+                    advanceToNextProcessOrRewind();
+                }
+                break;
+            case DECISION_REQUEST:
+                ownerNode.send(overConnection, new InRecoveryResponse(uncommitted.getTransactionID(), originalUpSet));
+                break;
+            case STATE_REQUEST:
+                ownerNode.send(overConnection, new UncertainResponse(uncommitted.getTransactionID()));
+                ownerNode.becomeParticipantInRecovery(uncommitted, false);
+                ownerNode.resetTimersFor(overConnection.getReceiverID());
+                break;
+            case UR_ELECTED:
+                updateNodeUpSet();
+                ownerNode.becomeCoordinatorInRecovery(uncommitted, false);
+                break;
                 /* Fail Cases */
-                case PARTIAL_BROADCAST:
-                    ownerNode.addFailure(message);
-                    break;
-                case DEATH_AFTER:
-                    ownerNode.addFailure(message);
-                    break;
+            case PARTIAL_BROADCAST:
+                ownerNode.addFailure(message);
+                break;
+            case DEATH_AFTER:
+                ownerNode.addFailure(message);
+                break;
 
-                case DELAY:
-                    Common.MESSAGE_DELAY = ((DelayMessage) message).getDelaySec()*1000;
+            case DELAY:
+                Common.MESSAGE_DELAY = ((DelayMessage) message).getDelaySec()*1000;
 
-                default:
-                    return false;
-            }
+            default:
+                return false;
         }
-		return true;
-	}
+        return true;
+    }
 
-	private void updateNodeUpSet() {
-		Collection<PeerReference> nodeUpSet = uncommitted.getPeerSet().stream()
-				.filter(pr -> recoveredProcesses.contains(pr.getNodeID()))
-				.collect(Collectors.toList());
-		ownerNode.setUpSet(nodeUpSet);
-	}
+    private void updateNodeUpSet() {
+        Collection<PeerReference> nodeUpSet = uncommitted.getPeerSet().stream()
+                                                         .filter(pr -> recoveredProcesses.contains(pr.getNodeID()))
+                                                         .collect(Collectors.toList());
+        ownerNode.setUpSet(nodeUpSet);
+    }
 
-	private void resetToNoInformation() {
-		state = ParticipantRecoveryState.NoInformation;
-		currentPeerIndex = 0;
-		recoveredProcesses = new HashSet<Integer>();
-		recoveredProcesses.add(ownerNode.getMyNodeID());
-		upSetIntersection = new HashSet<Integer>();
-		for (Integer peerId : originalUpSet) {
-			upSetIntersection.add(peerId);
-		}
-	}
+    private void resetToNoInformation() {
+        state = ParticipantRecoveryState.NoInformation;
+        currentPeerIndex = 0;
+        recoveredProcesses = new HashSet<Integer>();
+        recoveredProcesses.add(ownerNode.getMyNodeID());
+        upSetIntersection = new HashSet<Integer>();
+        for (Integer peerId : originalUpSet) {
+            upSetIntersection.add(peerId);
+        }
+    }
 
-	public void sendDecisionRequestToCurrentPeer() {
-		PeerReference current = sortedPeers.get(currentPeerIndex);
+    public void sendDecisionRequestToCurrentPeer() {
+        PeerReference current = sortedPeers.get(currentPeerIndex);
         Connection currentPeerConnection = ownerNode.isConnectedTo(current)
-                ? ownerNode.getPeerConnForId(current.nodeID)
+                ? ownerNode.getPeerConnForId(current.getNodeID())
                 : ownerNode.connectTo(current);
-        ownerNode.send(currentPeerConnection, new DecisionRequest(uncommitted.getTransactionID()));
+
+        System.out.println("Node "+ownerNode.getMyNodeID()+" adding timer for "+current.getNodeID());
+        ownerNode.addTimerFor(current.getNodeID());
+        if (currentPeerConnection.isReady()) {
+            System.out.println("Node "+ownerNode.getMyNodeID()+": sending DEC_REC to "+current.getNodeID());
+            ownerNode.send(currentPeerConnection, new DecisionRequest(uncommitted.getTransactionID()));
+        }
+        else {
+            System.out.println("Node "+ownerNode.getMyNodeID()+": could not send DEC_REC to "+current.getNodeID());
+        }
 	}
 
 	private void advanceToNextProcessOrRewind() {

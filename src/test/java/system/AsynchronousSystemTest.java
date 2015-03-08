@@ -315,6 +315,19 @@ public class AsynchronousSystemTest extends TestCommon {
         system.killAllNodes();
     }
 
+    @Test
+    public void testFutureCoordinatorFailure() throws Exception {
+        String cmdStr = "add a_song a_url -deathAfter 1 3 2 -deathAfter 1 4 2 -deathAfter 1 5 2 -partialPrecommit 3 1";
+        ConsoleCommand command = new ConsoleCommand(cmdStr, system.getTxnMgr().getNextTransactionID());
+        assertEquals(COMMIT, system.processCommandToCompletion(command).getCommand());
+
+        Thread.sleep(Common.TIMEOUT_MILLISECONDS*16);
+        for (int i = 1; i <= 5; i++) {
+            assertLogContains(i, COMMIT, TXID);
+        }
+        system.killAllNodes();
+    }
+
     private void assertLogContains(int nodeID, Message.Command command, int txid) throws IOException {
         Collection<Message> msgs = new FileDTLog(new File("logDir", String.valueOf(nodeID)), null).getLoggedMessages();
         Optional<Message> opM = msgs.stream()
