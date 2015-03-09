@@ -8,13 +8,15 @@ import messages.PeerTimeout;
 import messages.PrecommitRequest;
 import messages.StateRequest;
 import messages.UncertainResponse;
+import messages.YesResponse;
 import messages.vote_req.VoteRequest;
 import node.base.Node;
 import node.base.StateMachine;
+import system.failures.PartialBroadcast;
 import system.network.Connection;
 import util.Common;
 
-import java.io.EOFException;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.stream.Collectors;
@@ -34,7 +36,6 @@ public class CoordinatorStateMachine extends StateMachine {
 
 	private CoordinatorState state;
 	private Collection<Connection> txnConnections;
-	private Node ownerNode;
 	private VoteRequest action;
 	private int yesVotes;
 	private int ongoingTransactionID;
@@ -44,14 +45,32 @@ public class CoordinatorStateMachine extends StateMachine {
 	private int uncertainStates;
 	private int precommits;
 
-	public static CoordinatorStateMachine startInTerminationProtocol(Node ownerNode, VoteRequest action) {
+	public static CoordinatorStateMachine startInTerminationProtocol(Node ownerNode, VoteRequest action, boolean precommitted) {
 		CoordinatorStateMachine machine = new CoordinatorStateMachine(ownerNode);
 		machine.action = action;
 		machine.ongoingTransactionID = action.getTransactionID();
 		machine.state = CoordinatorState.WaitingForStates;
-		machine.uncertainStates = 1;
+        machine.setPeerSet(action.getPeerSet());
+        machine.acks = 1;
+        if (precommitted) {
+            machine.precommits = 1;
+        }
+        else {
+            machine.uncertainStates = 1;
+        }
 		Collection<PeerReference> notMe = ownerNode.getUpSet().stream().filter(pr -> pr.getNodeID() != ownerNode.getMyNodeID()).collect(Collectors.toList());
-		machine.setupTransactionConnectionsAndSendMessage(new StateRequest(machine.ongoingTransactionID), notMe);
+        if (notMe.isEmpty()) {
+            machine.txnConnections = new ArrayList<>();
+            if (precommitted) {
+                machine.commitCurrentAction();
+            }
+            else {
+                machine.abortCurrentTransaction();
+            }
+        }
+        else {
+            machine.setupTransactionConnectionsAndSendMessage(new StateRequest(machine.ongoingTransactionID), notMe);
+        }
 		return machine;
 	}
 
@@ -60,7 +79,7 @@ public class CoordinatorStateMachine extends StateMachine {
 	}
 
 	private CoordinatorStateMachine(Node ownerNode) {
-		this.ownerNode = ownerNode;
+        super(ownerNode);
 		resetToWaiting();
 	}
 
@@ -76,28 +95,21 @@ public class CoordinatorStateMachine extends StateMachine {
 		return action;
 	}
 
-    @Override public boolean receiveMessage(Connection overConnection) {
-
-        Message message;
-
-        try { message = overConnection.receiveMessage(); }
-        catch (EOFException e) { message = null; }
-
-        if (message == null) {
-    		return false;
-    	}
-
-        try { Thread.sleep(Common.MESSAGE_DELAY); }
-        catch (InterruptedException ignored) {}
-
+    @Override public boolean receiveMessage(Connection overConnection, Message message) {
         synchronized (this) {
             System.out.println("Coordinator "+ownerNode.getMyNodeID()+" "+
-                               "received a "+message.getCommand());
+                               "received a "+message.getCommand()+" from "+overConnection.getReceiverID());
 
             switch (message.getCommand()) {
                 case ADD:
                 case UPDATE:
                 case DELETE:
+                    if (overConnection.getReceiverID() > 0
+                     && overConnection.getReceiverID() < ownerNode.getMyNodeID())
+                    {
+                        ownerNode.becomeParticipant();
+                        ownerNode.getStateMachine().receiveMessage(overConnection, message);
+                    }
                     if (state == CoordinatorState.WaitingForCommand) {
                         receivePlaylistCommand((VoteRequest) message);
                         break;
@@ -135,12 +147,15 @@ public class CoordinatorStateMachine extends StateMachine {
                 case TIMEOUT:
                     int peerID = ((PeerTimeout) message).getPeerId();
                     ownerNode.cancelTimersFor(peerID);
-                    PeerReference ref = getPeerSet().stream()
-                                                    .filter(pr -> pr.nodeID == peerID)
-                                                    .findFirst()
-                                                    .get();
-                    ownerNode.logMessage(message);
-                    onTimeout(ref);
+                    if (ownerNode.getUpSet() == null) {
+                    } else {
+                        PeerReference ref = getPeerSet().stream()
+                                                        .filter(pr -> pr.nodeID == peerID)
+                                                        .findFirst()
+                                                        .get();
+                        ownerNode.logMessage(message);
+                        onTimeout(ref);
+                    }
                     break;
 
                 case COMMIT:
@@ -172,23 +187,30 @@ public class CoordinatorStateMachine extends StateMachine {
                 		throw new RuntimeException("Received PRE_COMMIT when not expecting one");
                 	}
                 	break;
-                // TODO decision request
                 case DECISION_REQUEST:
                     /* reply with most-recent decision */
-                    if (state == CoordinatorState.WaitingForCommand) {
-                        Message dec = ownerNode.getDecisionFor(message.getTransactionID());
-                        if (dec == null) {
-                            throw new RuntimeException("Couldn't find decision for txn "+message.getTransactionID());
+                    try {
+                        if (state == CoordinatorState.WaitingForCommand) {
+                            Message dec = ownerNode.getDecisionFor(message.getTransactionID());
+                            if (dec == null) {
+                                throw new RuntimeException("Couldn't find decision for txn "+message
+                                        .getTransactionID());
+                            }
+
+                            ownerNode.send(overConnection, dec);
                         }
-                        ownerNode.send(overConnection, dec);
-                    }
+
 
                     /* either
                         1. this coordinator is leading the charge for a recovery from total failure
                         2. we haven't come to a decision yet (unlikely)
                      */
-                    else {
-                        ownerNode.send(overConnection, new UncertainResponse(message.getTransactionID()));
+                        else {
+                            ownerNode.send(overConnection, new UncertainResponse(message.getTransactionID()));
+                        }
+                    }
+                    catch (IOException e) {
+                        ownerNode.getPeerConns().remove(overConnection);
                     }
                     break;
 
@@ -200,6 +222,20 @@ public class CoordinatorStateMachine extends StateMachine {
 
                 case DELAY:
                     Common.MESSAGE_DELAY = ((DelayMessage) message).getDelaySec()*1000;
+                    break;
+
+                case IN_RECOVERY:
+                case DUB_COORDINATOR:
+                    /* ignore */
+                    break;
+
+                case UR_ELECTED:
+                    try {
+                        ownerNode.send(overConnection, ownerNode.getDecisionFor(message.getTransactionID()));
+                    }
+                    catch (IOException e) {
+                        ownerNode.getPeerConns().remove(overConnection);
+                    }
                     break;
 
                 default:
@@ -215,18 +251,19 @@ public class CoordinatorStateMachine extends StateMachine {
         ownerNode.sendTxnMgrMsg(new PeerTimeout(peerReference.getNodeID()));
 
     	// if we're waiting for a command, a timeout doesn't matter.
-    	if (state == CoordinatorState.WaitingForVotes) {
+        final Connection refConn = ownerNode.getPeerConnForId(peerReference.nodeID);
+        if (state == CoordinatorState.WaitingForVotes) {
     		getPeerSet().remove(peerReference);
-    		txnConnections.remove(ownerNode.getPeerConnForId(peerReference.nodeID));
-    		abortCurrentTransaction();
+            if (refConn != null) {
+                txnConnections.remove(refConn);
+            }
+            abortCurrentTransaction();
     	}
     	else if (state == CoordinatorState.WaitingForAcks) {
-            // TODO I think this is a BUG
-            /* the peer should be removed from the UpSet and this should be Logged.
-             * the peer should NOT be removed from the peer set
-             */
     		getPeerSet().remove(peerReference);
-    		txnConnections.remove(ownerNode.getPeerConnForId(peerReference.nodeID));
+            if (refConn != null) {
+                txnConnections.remove(refConn);
+            }
     		checkForEnoughAcks();
     	}
     }
@@ -250,6 +287,7 @@ public class CoordinatorStateMachine extends StateMachine {
 	                       .collect(Collectors.toList());
 
 	    	ownerNode.logMessage(message);
+            ownerNode.logMessage(new YesResponse(message));
 	        setupTransactionConnectionsAndSendMessage(message, peerSet);
 	        setPeerSet(peerSet);
 	        ownerNode.getPeerConns().addAll(txnConnections);
@@ -270,23 +308,28 @@ public class CoordinatorStateMachine extends StateMachine {
     }
 
 	private void setupTransactionConnectionsAndSendMessage(Message message,
-			final Collection<PeerReference> peerSet) {
+                                                           final Collection<PeerReference> peerSet)
+    {
         Collection<Connection> conns = new ArrayList<>();
 
 		/* connect to every peer the ownerNode is not already connected to */
 		for (PeerReference reference : peerSet) {
+            /* start timers on everyone */
+            ownerNode.resetTimersFor(reference.getNodeID());
+            Connection conn = null;
+            try {
+                conn = ownerNode.getOrConnectToPeer(reference);
+                if (conn != null) {
+                    conns.add(conn);
+                    ownerNode.send(conn, message);
+                } else {
+                    ownerNode.log("Couldn't connect to "+reference.getNodeID());
+                }
+            }
+            catch (IOException e) {
+                System.err.println(ownerNode.getMyNodeID()+" couldn't send message to "+reference.getNodeID());
+            }
 
-		    Connection conn = ownerNode.isConnectedTo(reference)
-		                      ? ownerNode.getPeerConnForId(reference.nodeID)
-		                      : ownerNode.connectTo(reference);
-
-		    if (conn != null) {
-			    conns.add(conn);
-			    ownerNode.send(conn, message);
-
-			    /* start timers on everyone */
-			    ownerNode.resetTimersFor(reference.getNodeID());
-		    }
 		}
 		txnConnections = conns;
 	}
@@ -294,7 +337,7 @@ public class CoordinatorStateMachine extends StateMachine {
     private void abortCurrentTransaction() {
 		AbortRequest abort = new AbortRequest(ongoingTransactionID);
 		ownerNode.logMessage(abort);
-        ownerNode.broadcast(txnConnections, abort);
+        broadcast(abort);
 		resetToWaiting();
     }
 
@@ -306,6 +349,9 @@ public class CoordinatorStateMachine extends StateMachine {
     		}
     		else {
     			precommitCurrentAction();
+
+                // shallow copy upset into peer set
+                setPeerSet(upSet.stream().map(d->d).collect(Collectors.toList()));
     		}
     	}
     }
@@ -324,21 +370,53 @@ public class CoordinatorStateMachine extends StateMachine {
 		}
     }
 
+    private int partialBroadcastCount(Message.Command stage) {
+        final PartialBroadcast ptlBrdcst = ownerNode.getPartialBroadcast();
+        int limit = 1000;
+        if (ptlBrdcst != null && ptlBrdcst.getStage() == stage) {
+            limit = ptlBrdcst.getCountProcs();
+        }
+        return limit;
+    }
+
     private void precommitCurrentAction() {
-		PrecommitRequest precommit = new PrecommitRequest(ongoingTransactionID);
-		for (Connection connection : txnConnections) {
-            ownerNode.resetTimersFor(connection.getReceiverID());
-            ownerNode.send(connection, precommit);
-		}
+        PrecommitRequest precommit = new PrecommitRequest(ongoingTransactionID);
+        broadcast(precommit);
+        txnConnections.forEach(conn -> ownerNode.resetTimersFor(conn.getReceiverID()));
 		state = CoordinatorState.WaitingForAcks;
+    }
+
+    private void broadcast(Message message) {
+        int limit = partialBroadcastCount(message.getCommand());
+        int i = 0;
+        for (Connection connection : txnConnections) {
+            if (i++ >= limit) {
+                ownerNode.selfDestruct();
+            }
+            try {
+                ownerNode.send(connection, message);
+            }
+            catch (IOException e) {
+                ownerNode.cancelTimersFor(connection.getReceiverID());
+                onTimeout(getPeerSet().stream()
+                                      .filter(p -> p.getNodeID() == connection.getReceiverID())
+                                      .findFirst()
+                                      .get());
+                ownerNode.getPeerConns().remove(connection);
+            }
+        }
+        if (message.getCommand().isDecision()) {
+            ownerNode.sendTxnMgrMsg(message);
+        }
+        if (i == limit) {
+            ownerNode.selfDestruct();
+        }
     }
 
     private void commitCurrentAction() {
 		CommitRequest commit = new CommitRequest(ongoingTransactionID);
 		ownerNode.logMessage(commit);
-        for (Connection connection : txnConnections) {
-            ownerNode.send(connection, commit);
-		}
+        broadcast(commit);
         ownerNode.sendTxnMgrMsg(commit);
         ownerNode.applyActionToVolatileStorage(action);
         resetToWaiting();

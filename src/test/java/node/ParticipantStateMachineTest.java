@@ -14,13 +14,10 @@ import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import messages.vote_req.VoteRequest;
 import node.system.SyncNode;
-
 import org.junit.Before;
 import org.junit.Test;
-
 import system.network.QueueConnection;
 import system.network.QueueSocket;
-import util.Common;
 import util.SongTuple;
 import util.TestCommon;
 
@@ -336,42 +333,11 @@ public class ParticipantStateMachineTest extends TestCommon {
         testReceiveFromCoordinator(msg);
 
         /* assert correct resulting state */
-        assertEquals(TXID, participantSM.getOngoingTransactionID());
+        assertEquals(NO_ONGOING_TRANSACTION, participantSM.getOngoingTransactionID());
         assertNull(participantSM.getAction());
         assertNull(participantSM.getPeerSet());
         assertNull(participantUnderTest.getUpSet());
         assertThat(participantUnderTest.getDtLog().getLogAsString(), containsString("ABORT"));
-    }
-
-    /**
-     * This likely is incorrect because not enough of the async setup has been fleshed-out
-     * to properly know how to emulate the triggering of the heartbeat and what really
-     * should happen. This is a guess though.
-     */
-    @Test
-    public void testReceiveCoordinatorTimeout() throws Exception {
-        final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
-        participantSM.setAction(action);
-        participantSM.setPeerSet(A_PEER_REFS);
-        participantUnderTest.setUpSet(participantSM.getPeerSet()
-                                            .stream()
-                                            .map(PeerReference::clone)
-                                            .collect(Collectors.toList()));
-        final int coordID = A_PEER_REFS.iterator().next().getNodeID();
-        participantSM.setCoordinatorID(coordID);
-
-        /* start the timer */
-        participantUnderTest.resetTimersFor(coordID);
-
-        /* wait until it runs out */
-        Thread.sleep(Common.TIMEOUT_MILLISECONDS+200);
-
-        final String logAsString = participantUnderTest.getDtLog().getLogAsString();
-        assertThat(logAsString, containsString("TIMEOUT"));
-        assertThat(logAsString, containsString(String.valueOf(coordID)));
-        // normally the participant, having become the coordinator, would broadcast a state_req to the other peers,
-        // but we haven't given it any other connections to those peers.
-        assertTrue(participantUnderTest.getStateMachine() instanceof CoordinatorStateMachine);
     }
 
     @Test
@@ -397,14 +363,14 @@ public class ParticipantStateMachineTest extends TestCommon {
         testReceiveFromCoordinator(new DubCoordinatorMessage());
         assertTrue(participantUnderTest.getStateMachine() instanceof CoordinatorStateMachine);
     }
-    
+
     @Test
     public void testReceiveDecisionRequest_decisionAlreadyLogged_repliesWithDecision() {
         final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
         participantUnderTest.logMessage(action);
         participantUnderTest.logMessage(new YesResponse(action));
         participantUnderTest.logMessage(new CommitRequest(TXID));
-        
+
         testReceiveFromCoordinator(new DecisionRequest(TXID));
         Message last = getLastMessageInQueue(peerToCoordinator.getOutQueue());
         assertEquals(Command.COMMIT, last.getCommand());
@@ -417,12 +383,12 @@ public class ParticipantStateMachineTest extends TestCommon {
         participantUnderTest.logMessage(new YesResponse(action));
         participantSM.setOngoingTransactionID(TXID);
         participantSM.setPrecommitted(true);
-        
+
         testReceiveFromCoordinator(new DecisionRequest(TXID));
         Message last = getLastMessageInQueue(peerToCoordinator.getOutQueue());
         assertEquals(Command.PRE_COMMIT, last.getCommand());
     }
-    
+
     @Test
     public void testReceiveDecisionRequest_uncertain_repliesWithUncertain() {
         final VoteRequest action = new AddRequest(A_SONG_TUPLE, TXID, A_PEER_REFS);
@@ -430,7 +396,7 @@ public class ParticipantStateMachineTest extends TestCommon {
         participantUnderTest.logMessage(new YesResponse(action));
         participantSM.setOngoingTransactionID(TXID);
         participantSM.setPrecommitted(false);
-        
+
         testReceiveFromCoordinator(new DecisionRequest(TXID));
         Message last = getLastMessageInQueue(peerToCoordinator.getOutQueue());
         assertEquals(Command.UNCERTAIN, last.getCommand());

@@ -2,6 +2,7 @@ package node.system;
 
 import messages.Message;
 import messages.NodeMessage;
+import node.ParticipantRecoveryStateMachine;
 import node.PeerReference;
 import node.base.Node;
 import system.network.Connection;
@@ -38,11 +39,12 @@ public class AsyncProcessNode extends Node {
         L = new AsyncLogger(getMyNodeID(), getListenPort());
         new Thread(nodeServer).start();
 
+        recoverFromDtLog();
+
         /* connect to System */
         try {
             final Socket socket = new Socket(Common.LOCALHOST, systemListenPort);
             txnMgrConn = new ObjectConnection(socket, TXN_MGR_ID);
-            L.OG("connected to System");
 
             /* tell the System my logical ID and listen port */
             // (doesn't increment sent-msgs count)
@@ -54,7 +56,9 @@ public class AsyncProcessNode extends Node {
             System.exit(Common.EXIT_FAILURE);
         }
 
-        recoverFromDtLog();
+        if (stateMachine instanceof ParticipantRecoveryStateMachine) {
+            ((ParticipantRecoveryStateMachine)stateMachine).sendDecisionRequestToCurrentPeer();
+        }
     }
 
     int getListenPort() {
@@ -67,7 +71,6 @@ public class AsyncProcessNode extends Node {
             System.err.println("Connection is null");
         }
         else {
-            L.OG("connected to "+connection.getReceiverID());
             new Thread(new ConnectionListener(this, (ObjectConnection) connection)).start();
         }
     }
@@ -82,25 +85,20 @@ public class AsyncProcessNode extends Node {
      * In the asynchronous case, it means (SYNCHRONOUSLY) establishing a socket with the referenced
      * peer's server
      */
-    @Override public Connection connectTo(PeerReference peerReference) {
-        try {
-            L.OG("Connecting to "+peerReference.getNodeID());
-            final ObjectConnection connection = new ObjectConnection(
-                    new Socket(LOCALHOST, peerReference.getListeningPort()),
-                    peerReference.getNodeID());
-            addConnection(connection);
-            connection.sendMessage(new NodeMessage(getMyNodeID(), getListenPort()));
-            return connection;
-        }
-        catch (IOException e) {
-            System.err.println("Couldn't connect to peer "+peerReference.getNodeID()+" "+
-                               "on port "+peerReference.getListeningPort());
-            e.printStackTrace();
-            return null;
-        }
+    @Override public Connection connectTo(PeerReference peerReference) throws IOException {
+        final ObjectConnection connection = new ObjectConnection(
+                new Socket(LOCALHOST, peerReference.getListeningPort()),
+                peerReference.getNodeID());
+        addConnection(connection);
+        connection.sendMessage(new NodeMessage(getMyNodeID(), getListenPort()));
+        return connection;
     }
 
-    @Override protected void selfDestruct() {
+    @Override public void addTimerFor(int peerID) {
+        timeoutMonitor.startTimer(peerID);
+    }
+
+    @Override public void selfDestruct() {
         System.err.println("Node "+getMyNodeID()+" self destructing!");
         System.exit(Common.EXIT_SUCCESS);
     }

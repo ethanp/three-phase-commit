@@ -6,12 +6,13 @@ import system.network.Connection;
 import util.Common;
 
 import java.io.EOFException;
+import java.io.IOException;
 
 /**
  * Ethan Petuchowski 2/16/15
  */
 public class ManagerNodeRef {
-    protected int nodeID;
+    private int nodeID;
     protected Connection conn;
     protected int listenPort;
 
@@ -35,7 +36,7 @@ public class ManagerNodeRef {
         return nodeID;
     }
 
-    public void sendMessage(Message message) {
+    public void sendMessage(Message message) throws IOException {
         getConn().sendMessage(message);
     }
 

@@ -6,6 +6,7 @@ import messages.vote_req.VoteRequest;
 import node.PeerReference;
 import system.network.Network;
 
+import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -19,7 +20,7 @@ public abstract class TransactionManager {
 
     protected List<ManagerNodeRef> nodes;
     protected Network network;
-    protected ManagerNodeRef coordinator;
+    private ManagerNodeRef coordinator;
     protected int currentTxnID;
 
     public TransactionManager(int numNodes) {
@@ -44,28 +45,64 @@ public abstract class TransactionManager {
     }
 
     public void broadcast(Message message) {
-        getNodes().forEach(n -> n.sendMessage(message));
+        getNodes().forEach(n -> {
+            try {
+                n.sendMessage(message);
+            }
+            catch (IOException e) {
+                /* ignore */
+            }
+        });
     }
 
     public void processRequest(VoteRequest voteRequest) {
-        coordinator.sendMessage(voteRequest);
+        dubCoordinator(1);
+        try {
+            getCoordinator().sendMessage(voteRequest);
+        }
+        catch (IOException e) {
+            /* ignore */
+        }
     }
 
     public void sendCoordinator(Message message) {
-        coordinator.sendMessage(message);
+        try {
+            getCoordinator().sendMessage(message);
+        }
+        catch (IOException e) {
+            /* ignore */
+        }
     }
 
     public void send(int nodeID, Message message) {
-        getNodeByID(nodeID).sendMessage(message);
+        try {
+            getNodeByID(nodeID).sendMessage(message);
+        }
+        catch (IOException e) {
+            /* ignore */
+        }
     }
 
     public void dubCoordinator(int nodeID) {
         final ManagerNodeRef newCoord = remoteNodeWithID(nodeID);
-        newCoord.sendMessage(new DubCoordinatorMessage());
-        coordinator = newCoord;
+        try {
+            newCoord.sendMessage(new DubCoordinatorMessage());
+        }
+        catch (IOException e) {
+            System.err.println("Couldn't dub coordinator");
+        }
+        setCoordinator(newCoord);
     }
 
     public ManagerNodeRef getNodeByID(int nodeID) {
         return getNodes().stream().filter(n -> n.getNodeID() == nodeID).findFirst().get();
+    }
+
+    public ManagerNodeRef getCoordinator() {
+        return coordinator;
+    }
+
+    public void setCoordinator(ManagerNodeRef coordinator) {
+        this.coordinator = coordinator;
     }
 }

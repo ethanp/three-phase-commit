@@ -9,6 +9,7 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException;
  * Ethan Petuchowski 3/3/15
  */
 public class DeathAfter extends Message {
+    public static final int ELECTION_DEATH = -1;
     public DeathAfter(int numMsgs, int fromProc, int whichProc) {
         super(Command.DEATH_AFTER);
         this.numMsgs = numMsgs;

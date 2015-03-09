@@ -1,32 +1,31 @@
 package node;
 
-import static org.junit.Assert.*;
-
-import java.util.ArrayList;
-import java.util.Collection;
-
 import messages.AbortRequest;
 import messages.CommitRequest;
 import messages.InRecoveryResponse;
 import messages.Message;
+import messages.Message.Command;
 import messages.PeerTimeout;
 import messages.PrecommitRequest;
 import messages.UncertainResponse;
 import messages.YesResponse;
-import messages.Message.Command;
 import messages.vote_req.AddRequest;
 import messages.vote_req.DeleteRequest;
 import messages.vote_req.UpdateRequest;
 import node.mock.ByteArrayDTLog;
 import node.system.SyncNode;
-
 import org.junit.Before;
 import org.junit.Test;
-
 import system.network.QueueConnection;
 import system.network.QueueSocket;
 import util.SongTuple;
 import util.TestCommon;
+
+import java.util.ArrayList;
+import java.util.Collection;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class RecoveryStateMachineTest extends TestCommon {
 
@@ -182,6 +181,7 @@ public class RecoveryStateMachineTest extends TestCommon {
 		nodeUnderTest.setDtLog(stubNode.getDtLog());
 		nodeUnderTest.recoverFromDtLog();
 		prsm = (ParticipantRecoveryStateMachine)nodeUnderTest.getStateMachine();
+        prsm.sendDecisionRequestToCurrentPeer();
 		assertTrue(prsm != null);
 	}
 

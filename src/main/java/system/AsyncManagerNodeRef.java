@@ -11,6 +11,12 @@ public class AsyncManagerNodeRef extends ManagerNodeRef {
     }
 
     @Override public void killNode() {
-        process.destroy();
+        if (!isAlive()) {
+            process.destroy();
+        }
+    }
+
+    public boolean isAlive() {
+        return process.isAlive();
     }
 }

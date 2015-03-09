@@ -11,7 +11,6 @@ import java.util.Scanner;
 public class CommandConsole implements Runnable {
 
     Scanner sc = new Scanner(System.in);
-    int transactionID = 0;
     final AsyncTxnMgr transactionManager;
 
     public CommandConsole(@NotNull AsyncTxnMgr mgr) {
@@ -19,9 +18,9 @@ public class CommandConsole implements Runnable {
     }
 
     @Override public void run() {
-        while (true) {
+        while (sc.hasNextLine()) {
             String cmdStr = sc.nextLine();
-            ConsoleCommand cmd = new ConsoleCommand(cmdStr, ++transactionID);
+            ConsoleCommand cmd = new ConsoleCommand(cmdStr, transactionManager.getNextTransactionID());
             transactionManager.processCommand(cmd);
         }
     }

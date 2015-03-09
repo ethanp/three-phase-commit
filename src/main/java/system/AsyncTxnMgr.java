@@ -62,6 +62,8 @@ public class AsyncTxnMgr extends TransactionManager {
     protected TxnMgrServer mgrServer;
     protected AsyncLogger L;
 
+    protected int transactionID = 0;
+
     protected CommandConsole console;
 
 
@@ -71,6 +73,7 @@ public class AsyncTxnMgr extends TransactionManager {
 
     public void processCommand(ConsoleCommand command) {
 
+        transactionResult = null;
         /**
          * Actually INSTEAD of passing the failures to the node as a commandline param
          * we should send it to the node as a message
@@ -78,14 +81,14 @@ public class AsyncTxnMgr extends TransactionManager {
          */
         for (Message failure : command.getFailureModes()) {
             if (failure instanceof PartialBroadcast) {
-                send(((PartialBroadcast)failure).getWhichProc(), failure);
+                send(((PartialBroadcast) failure).getWhichProc(), failure);
             }
             /**
              * NB: You can only send a node ONE DeathAfter for it to know until it fails.
              * This would be simple-ish to fix though.
              */
             else if (failure instanceof DeathAfter) {
-                int procID = ((DeathAfter)failure).getWhichProc();
+                int procID = ((DeathAfter) failure).getWhichProc();
                 send(procID, failure);
             }
         }
@@ -105,9 +108,13 @@ public class AsyncTxnMgr extends TransactionManager {
                 ManagerNodeRef nodeToKill = remoteNodeWithID(killSig.getNodeID());
                 restartNode(nodeToKill);
                 break;
+            case LIST:
+                broadcast(command.getVoteRequest());
+                break;
             default:
                 addPeerSet(command);
                 processRequest(command.getVoteRequest());
+                break;
         }
 
     }
@@ -184,8 +191,7 @@ public class AsyncTxnMgr extends TransactionManager {
         new Thread(mgrServer).start();
     }
 
-    public void receiveResponse(Message response) {
-
+    public synchronized void receiveResponse(Message response) {
         switch (response.getCommand()) {
             case COMMIT:
             case ABORT:
@@ -193,19 +199,34 @@ public class AsyncTxnMgr extends TransactionManager {
                 break;
 
             case TIMEOUT:
-                reviveNode((PeerTimeout)response);
+                final int peerId = ((PeerTimeout) response).getPeerId();
+//                if (peerId > getCoordinator().getNodeID()) {
+                    reviveNode(peerId);
+//                }
                 break;
 
+            default:
+//                if (getTransactionResult() == null) {
+//                    try { Thread.sleep(500); } catch (InterruptedException e) {}
+//                    sendCoordinator(new DecisionRequest(getTransactionID()));
+//                }
+                break;
         }
     }
 
-    private void reviveNode(PeerTimeout response) {
-        int deadID = response.getPeerId();
+    protected void reviveNode(int deadID) {
+        if (((AsyncManagerNodeRef)getNodeByID(deadID)).isAlive()) {
+            return;
+        }
         nodes = getNodes().stream()
                           .filter(r -> r.getNodeID() != deadID)
                           .collect(Collectors.toList());
         L.OG("Reviving node "+deadID);
-        nodes.add(createNode(deadID));
+        final ManagerNodeRef newNode = createNode(deadID);
+        nodes.add(newNode);
+        if (deadID == 1) {
+            setCoordinator(newNode);
+        }
     }
 
     private void signalSystem(Message response) {
@@ -222,5 +243,13 @@ public class AsyncTxnMgr extends TransactionManager {
 
     public void setTransactionResult(Message transactionResult) {
         this.transactionResult = transactionResult;
+    }
+
+    public int getTransactionID() {
+        return transactionID;
+    }
+
+    public int getNextTransactionID() {
+        return ++transactionID;
     }
 }

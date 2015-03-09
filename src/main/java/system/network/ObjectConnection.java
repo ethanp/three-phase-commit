@@ -1,7 +1,6 @@
 package system.network;
 
 import messages.Message;
-import util.Common;
 
 import java.io.EOFException;
 import java.io.IOException;
@@ -26,7 +25,7 @@ public class ObjectConnection extends Connection {
             in = new ObjectInputStream(socket.getInputStream());
         }
         catch (IOException e) {
-            e.printStackTrace();
+            System.err.println("Failed to create object streams to "+getReceiverID());
         }
     }
 
@@ -36,7 +35,6 @@ public class ObjectConnection extends Connection {
                 return (Message) in.readObject();
             }
             catch (EOFException e) {
-                System.err.println("Node "+Common.ASYNC_NODE_ID+": EOF from "+getReceiverID());
                 try {
                     socket.close();
                 }
@@ -58,22 +56,16 @@ public class ObjectConnection extends Connection {
         return null;
     }
 
-    @Override public void sendMessage(Message o) {
-        if (isReady()) {
-            try {
-                out.writeObject(o);
-                out.flush();
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-            }
-        }
-        else {
-            System.err.println("Socket not write-to-able");
-        }
+    @Override public void sendMessage(Message o) throws IOException {
+        out.writeObject(o);
+        out.flush();
     }
 
     public boolean isReady() {
-        return socket.isBound() && socket.isConnected() && !socket.isClosed();
+        return socket.isBound()
+               && socket.isConnected()
+               && !socket.isClosed()
+               && in != null
+               && out != null;
     }
 }
